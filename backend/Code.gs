@@ -26,6 +26,18 @@ function doGet(e) {
     return jsonResponse({ success: true, deleted: deleted });
   }
 
+  if (action === 'debug') {
+    var debugKey = (e && e.parameter && e.parameter.key) || '';
+    var cleanupKey = Config.get('CLEANUP_KEY');
+    if (!cleanupKey || debugKey !== cleanupKey) {
+      return jsonResponse({ success: false, error: 'UNAUTHORIZED' });
+    }
+    return jsonResponse({ success: true, debug: CalendarService.debug(
+      new Date((e && e.parameter && e.parameter.start) || Date.now()),
+      new Date((e && e.parameter && e.parameter.end) || (Date.now() + 7 * 24 * 60 * 60 * 1000))
+    )});
+  }
+
   return jsonResponse({ success: false, error: 'UNKNOWN_ACTION', message: 'Unknown action: ' + action });
 }
 

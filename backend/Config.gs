@@ -13,6 +13,7 @@ var Config = (function () {
     MIN_NOTICE_HOURS: '12',
     MAX_ADVANCE_DAYS: '90',
     TOKEN_EXPIRY_DAYS: '90',
+    CONFLICT_CALENDAR_IDS: '',  // JSON array of calendar IDs to check for conflicts
   };
 
   function get(key) {

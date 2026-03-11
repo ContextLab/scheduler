@@ -104,44 +104,38 @@ var CalendarService = (function () {
       getDesignatedCalendarBusyTimes(designatedCalId, pattern, startDate, endDate)
     );
 
-    try {
-      // Use Calendar Advanced Service for freeBusy query on OTHER calendars
-      var calendars = CalendarApp.getAllCalendars();
-      var calendarIds = calendars
-        .filter(function (cal) { return cal.getId() !== designatedCalId; })
-        .map(function (cal) { return { id: cal.getId() }; });
+    // Get configured conflict calendars (only these are checked for busy times)
+    var conflictIds = getConflictCalendarIds(designatedCalId);
 
-      if (calendarIds.length === 0) {
-        return mergePeriods(busyTimes);
-      }
+    if (conflictIds.length > 0) {
+      try {
+        var request = {
+          timeMin: startDate.toISOString(),
+          timeMax: endDate.toISOString(),
+          items: conflictIds.map(function (id) { return { id: id }; }),
+        };
 
-      var request = {
-        timeMin: startDate.toISOString(),
-        timeMax: endDate.toISOString(),
-        items: calendarIds,
-      };
+        var response = Calendar.Freebusy.query(request);
 
-      var response = Calendar.Freebusy.query(request);
-
-      if (response && response.calendars) {
-        for (var calId in response.calendars) {
-          var calData = response.calendars[calId];
-          if (calData.busy) {
-            for (var j = 0; j < calData.busy.length; j++) {
-              busyTimes.push({
-                start: new Date(calData.busy[j].start).getTime(),
-                end: new Date(calData.busy[j].end).getTime(),
-              });
+        if (response && response.calendars) {
+          for (var calId in response.calendars) {
+            var calData = response.calendars[calId];
+            if (calData.busy) {
+              for (var j = 0; j < calData.busy.length; j++) {
+                busyTimes.push({
+                  start: new Date(calData.busy[j].start).getTime(),
+                  end: new Date(calData.busy[j].end).getTime(),
+                });
+              }
             }
           }
         }
+      } catch (e) {
+        Logger.log('FreeBusy query failed, falling back to event scan: ' + e.message);
+        busyTimes = busyTimes.concat(
+          getAllBusyTimesFallback(startDate, endDate, designatedCalId, conflictIds)
+        );
       }
-    } catch (e) {
-      Logger.log('FreeBusy query failed, falling back to event scan: ' + e.message);
-      // Fallback: scan events on all non-designated calendars
-      busyTimes = busyTimes.concat(
-        getAllBusyTimesFallback(startDate, endDate, designatedCalId)
-      );
     }
 
     // Sort and merge overlapping busy periods
@@ -179,21 +173,37 @@ var CalendarService = (function () {
   /**
    * Fallback: scan events on all calendars when Advanced Service unavailable.
    */
-  function getAllBusyTimesFallback(startDate, endDate, excludeCalId) {
-    var calendars = CalendarApp.getAllCalendars();
+  /**
+   * Parse the CONFLICT_CALENDAR_IDS Script Property.
+   * Returns array of calendar IDs to check for conflicts (excluding designated).
+   */
+  function getConflictCalendarIds(designatedCalId) {
+    var raw = Config.get('CONFLICT_CALENDAR_IDS');
+    if (!raw) return [];
+
+    try {
+      var ids = JSON.parse(raw);
+      if (!Array.isArray(ids)) return [];
+      return ids.filter(function (id) { return id !== designatedCalId; });
+    } catch (e) {
+      // Try comma-separated fallback
+      return raw.split(',').map(function (s) { return s.trim(); })
+        .filter(function (id) { return id && id !== designatedCalId; });
+    }
+  }
+
+  function getAllBusyTimesFallback(startDate, endDate, excludeCalId, onlyCalIds) {
     var busyTimes = [];
 
-    for (var i = 0; i < calendars.length; i++) {
-      // Skip the designated calendar (handled separately)
-      if (excludeCalId && calendars[i].getId() === excludeCalId) continue;
+    for (var i = 0; i < onlyCalIds.length; i++) {
+      var calendar = CalendarApp.getCalendarById(onlyCalIds[i]);
+      if (!calendar) continue;
 
-      var events = calendars[i].getEvents(startDate, endDate);
+      var events = calendar.getEvents(startDate, endDate);
       for (var j = 0; j < events.length; j++) {
-        // Skip events the user has declined
         var myStatus = events[j].getMyStatus();
-        if (myStatus === CalendarApp.GuestStatus.NO) {
-          continue;
-        }
+        if (myStatus === CalendarApp.GuestStatus.NO) continue;
+
         busyTimes.push({
           start: events[j].getStartTime().getTime(),
           end: events[j].getEndTime().getTime(),
@@ -285,7 +295,58 @@ var CalendarService = (function () {
     return slots;
   }
 
+  function debug(startDate, endDate) {
+    var calendarId = Config.get('CALENDAR_ID');
+    var pattern = Config.get('AVAILABILITY_PATTERN');
+    var calendar = CalendarApp.getCalendarById(calendarId);
+    var calName = calendar ? calendar.getName() : 'NOT FOUND';
+
+    var allEvents = calendar ? calendar.getEvents(startDate, endDate) : [];
+    var eventList = allEvents.map(function (ev) {
+      return {
+        title: ev.getTitle(),
+        start: ev.getStartTime().toISOString(),
+        end: ev.getEndTime().toISOString(),
+      };
+    });
+
+    var windows = findAvailabilityWindows(calendarId, pattern, startDate, endDate);
+
+    var allCalendars = CalendarApp.getAllCalendars();
+    var calIds = allCalendars.map(function (c) { return c.getId() + ' (' + c.getName() + ')'; });
+
+    // Run the full pipeline to show busy times
+    var busyTimes = getAllBusyTimes(startDate, endDate);
+    var freeWindows = subtractBusyTimes(windows, busyTimes);
+    var slots = generateSlots(freeWindows, 15);
+
+    return {
+      calendarId: calendarId,
+      calendarName: calName,
+      pattern: pattern,
+      dateRange: { start: startDate.toISOString(), end: endDate.toISOString() },
+      totalEventsInRange: eventList.length,
+      events: eventList,
+      availabilityWindowsFound: windows.length,
+      windows: windows.map(function (w) {
+        return { start: new Date(w.start).toISOString(), end: new Date(w.end).toISOString() };
+      }),
+      busyTimesCount: busyTimes.length,
+      busyTimes: busyTimes.map(function (b) {
+        return { start: new Date(b.start).toISOString(), end: new Date(b.end).toISOString() };
+      }),
+      freeWindowsAfterSubtract: freeWindows.length,
+      freeWindows: freeWindows.map(function (w) {
+        return { start: new Date(w.start).toISOString(), end: new Date(w.end).toISOString() };
+      }),
+      slotsGenerated: slots.length,
+      allCalendarCount: allCalendars.length,
+      allCalendarIds: calIds,
+    };
+  }
+
   return {
     getAvailableSlots: getAvailableSlots,
+    debug: debug,
   };
 })();
