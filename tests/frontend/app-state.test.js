@@ -7,7 +7,7 @@
 // App module will be implemented in T031/T035
 let App;
 try {
-  App = require('../../frontend/js/app');
+  App = require('../../js/app');
 } catch (e) {
   App = null;
 }

@@ -7,7 +7,7 @@
 // BookingForm module will be implemented in T033
 let BookingForm;
 try {
-  BookingForm = require('../../frontend/js/booking-form');
+  BookingForm = require('../../js/booking-form');
 } catch (e) {
   // Module doesn't exist yet - TDD. Tests will fail until T033 implementation.
   BookingForm = null;

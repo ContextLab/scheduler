@@ -3,7 +3,7 @@
  * Tests UTC-local conversion, timezone detection, date formatting, timezone selector rendering.
  */
 
-const TimezoneUtil = require('../../frontend/js/timezone');
+const TimezoneUtil = require('../../js/timezone');
 
 describe('TimezoneUtil.detect', () => {
   test('detects browser timezone via Intl API', () => {

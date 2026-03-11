@@ -3,7 +3,7 @@
  * Tests YAML parsing of meeting types, locations, settings; error handling for missing/malformed files.
  */
 
-const ConfigLoader = require('../../frontend/js/config-loader');
+const ConfigLoader = require('../../js/config-loader');
 
 // Provide a minimal jsyaml stub for the global scope (ConfigLoader uses global jsyaml)
 global.jsyaml = { load: jest.fn((text) => JSON.parse(text)) };

@@ -17,7 +17,7 @@ See [quickstart.md](specs/001-booking-scheduler/quickstart.md) for full setup in
 
 ## Configuration
 
-### Meeting Types (`frontend/config/meeting-types.yaml`)
+### Meeting Types (`config/meeting-types.yaml`)
 
 Define available meeting types. Each entry requires:
 
@@ -46,7 +46,7 @@ meeting_types:
 
 To add a new type, add an entry to the `meeting_types` array. To remove one, delete the entry. Changes take effect on the next GitHub Pages deployment.
 
-### Locations (`frontend/config/locations.yaml`)
+### Locations (`config/locations.yaml`)
 
 Define meeting format options shown in the booking form dropdown.
 
@@ -70,7 +70,7 @@ locations:
 
 You can add additional formats (e.g., Microsoft Teams, Google Meet, phone call) by adding entries.
 
-### Settings (`frontend/config/settings.yaml`)
+### Settings (`config/settings.yaml`)
 
 | Field | Description | Default |
 |-|-|-|
@@ -84,14 +84,13 @@ You can add additional formats (e.g., Microsoft Teams, Google Meet, phone call) 
 ## Architecture
 
 ```
-frontend/          GitHub Pages static site
-  index.html       Main booking flow (4-step wizard)
-  cancel.html      Cancellation page
-  reschedule.html  Reschedule page
-  config/          YAML configuration files
-  css/             Styles (sage green theme)
-  js/              Application modules
-  lib/             Vendored libraries (js-yaml, FullCalendar)
+index.html         Main booking flow (4-step wizard)
+cancel.html        Cancellation page
+reschedule.html    Reschedule page
+config/            YAML configuration files
+css/               Styles (sage green theme)
+js/                Application modules
+lib/               Vendored libraries (js-yaml, FullCalendar)
 
 backend/           Google Apps Script
   Code.gs          Request routing and handlers

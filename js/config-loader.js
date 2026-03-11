@@ -1,6 +1,6 @@
 /**
  * Config Loader — fetches and parses YAML configuration files.
- * Loads meeting-types.yaml, locations.yaml, and settings.yaml from frontend/config/.
+ * Loads meeting-types.yaml, locations.yaml, and settings.yaml from config/.
  */
 
 const ConfigLoader = (function () {
