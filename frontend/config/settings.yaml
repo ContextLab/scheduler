@@ -1,0 +1,6 @@
+availability_pattern: "Jeremy office hours"
+min_notice_hours: 12
+max_advance_days: 90
+default_timezone: "America/New_York"
+theme_color: "#CCE2D8"
+apps_script_url: "PLACEHOLDER_APPS_SCRIPT_URL"

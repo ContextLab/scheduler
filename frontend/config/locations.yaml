@@ -1,0 +1,8 @@
+locations:
+  - id: virtual
+    label: "Virtual (Zoom)"
+    value: "https://dartmouth.zoom.us/my/contextlab"
+
+  - id: in-person
+    label: "In-person"
+    value: "Moore 349, Dartmouth College, Hanover, NH 03755"

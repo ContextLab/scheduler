@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schedule a Meeting</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="lib/js-yaml.min.js"></script>
+  <script src="lib/fullcalendar.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Schedule a Meeting</h1>
+      <div class="timezone-selector" id="timezone-selector">
+        <label for="timezone-select">Timezone:</label>
+        <select id="timezone-select" aria-label="Select your timezone"></select>
+      </div>
+    </header>
+
+    <div class="steps">
+      <div class="step-indicator" id="step-indicator">
+        <span class="step active" data-step="1">1. Meeting Type</span>
+        <span class="step" data-step="2">2. Date &amp; Time</span>
+        <span class="step" data-step="3">3. Your Details</span>
+        <span class="step" data-step="4">4. Confirmation</span>
+      </div>
+    </div>
+
+    <!-- Step 1: Meeting Type Selection -->
+    <section id="step-1" class="step-content active" aria-label="Select meeting type">
+      <h2>Select a Meeting Type</h2>
+      <div id="meeting-types" class="meeting-types-grid"></div>
+    </section>
+
+    <!-- Step 2: Calendar / Slot Selection -->
+    <section id="step-2" class="step-content" aria-label="Select date and time">
+      <h2>Choose a Time</h2>
+      <p id="selected-type-info" class="selected-info"></p>
+      <button class="btn btn-back" id="back-to-step-1" aria-label="Go back to meeting type selection">&larr; Back</button>
+      <div id="calendar-container" class="calendar-container"></div>
+    </section>
+
+    <!-- Step 3: Booking Form -->
+    <section id="step-3" class="step-content" aria-label="Enter your details">
+      <h2>Your Details</h2>
+      <p id="selected-slot-info" class="selected-info"></p>
+      <button class="btn btn-back" id="back-to-step-2" aria-label="Go back to time selection">&larr; Back</button>
+      <form id="booking-form" novalidate>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="first-name">First Name <span class="required">*</span></label>
+            <input type="text" id="first-name" name="firstName" required aria-required="true">
+            <span class="error-message" id="first-name-error"></span>
+          </div>
+          <div class="form-group">
+            <label for="last-name">Last Name <span class="required">*</span></label>
+            <input type="text" id="last-name" name="lastName" required aria-required="true">
+            <span class="error-message" id="last-name-error"></span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="email">Email Address <span class="required">*</span></label>
+          <input type="email" id="email" name="email" required aria-required="true">
+          <span class="error-message" id="email-error"></span>
+        </div>
+        <div class="form-group">
+          <label for="format">Meeting Format <span class="required">*</span></label>
+          <select id="format" name="format" required aria-required="true">
+            <option value="">Select format...</option>
+          </select>
+          <span class="error-message" id="format-error"></span>
+        </div>
+        <div class="form-group">
+          <label for="purpose">Meeting Purpose</label>
+          <textarea id="purpose" name="purpose" rows="3" placeholder="What would you like to discuss?"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="notes">Other notes, links, or information</label>
+          <textarea id="notes" name="notes" rows="3" placeholder="Any links, documents, or context you'd like me to review before we meet?"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" id="submit-booking">Confirm Booking</button>
+      </form>
+    </section>
+
+    <!-- Step 4: Confirmation -->
+    <section id="step-4" class="step-content" aria-label="Booking confirmation">
+      <div id="confirmation-content"></div>
+    </section>
+
+    <!-- Loading overlay -->
+    <div id="loading" class="loading-overlay" aria-hidden="true">
+      <div class="spinner"></div>
+      <p>Processing...</p>
+    </div>
+
+    <!-- Error display -->
+    <div id="error-banner" class="error-banner" role="alert" aria-live="polite"></div>
+  </div>
+
+  <script src="js/config-loader.js"></script>
+  <script src="js/timezone.js"></script>
+  <script src="js/api-client.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/booking-form.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
