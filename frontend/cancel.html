@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cancel Booking</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="lib/js-yaml.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Cancel Booking</h1>
+    </header>
+
+    <section class="step-content active">
+      <div id="cancel-content" class="confirmation-box">
+        <p>Processing cancellation...</p>
+      </div>
+    </section>
+
+    <div id="loading" class="loading-overlay" aria-hidden="true">
+      <div class="spinner"></div>
+      <p>Cancelling...</p>
+    </div>
+
+    <div id="error-banner" class="error-banner" role="alert" aria-live="polite"></div>
+  </div>
+
+  <script src="js/config-loader.js"></script>
+  <script src="js/api-client.js"></script>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var token = params.get('token');
+      var container = document.getElementById('cancel-content');
+      var loading = document.getElementById('loading');
+
+      if (!token) {
+        container.textContent = '';
+        var h2 = document.createElement('h2');
+        h2.textContent = 'Invalid Link';
+        container.appendChild(h2);
+        var p = document.createElement('p');
+        p.textContent = 'No booking token provided. Please use the cancel link from your confirmation email.';
+        container.appendChild(p);
+        return;
+      }
+
+      // Load config to get API URL
+      ConfigLoader.loadAll()
+        .then(function (config) {
+          ApiClient.init(config.settings.apps_script_url);
+          loading.classList.add('visible');
+          return ApiClient.cancelBooking(token);
+        })
+        .then(function () {
+          loading.classList.remove('visible');
+          container.textContent = '';
+
+          var checkmark = document.createElement('div');
+          checkmark.className = 'checkmark';
+          checkmark.textContent = '\u2713';
+          container.appendChild(checkmark);
+
+          var h2 = document.createElement('h2');
+          h2.textContent = 'Booking Cancelled';
+          container.appendChild(h2);
+
+          var p = document.createElement('p');
+          p.style.marginTop = '12px';
+          p.textContent = 'Your booking has been cancelled. A cancellation notice has been sent to both parties.';
+          container.appendChild(p);
+
+          var links = document.createElement('div');
+          links.className = 'confirmation-links';
+          links.style.marginTop = '16px';
+          var a = document.createElement('a');
+          a.href = './';
+          a.textContent = 'Book a new meeting';
+          links.appendChild(a);
+          container.appendChild(links);
+        })
+        .catch(function (err) {
+          loading.classList.remove('visible');
+          container.textContent = '';
+
+          var h2 = document.createElement('h2');
+          h2.style.color = '#D63031';
+
+          if (err.code === 'ALREADY_CANCELLED') {
+            h2.textContent = 'Already Cancelled';
+            container.appendChild(h2);
+            var p = document.createElement('p');
+            p.style.marginTop = '12px';
+            p.textContent = 'This booking has already been cancelled.';
+            container.appendChild(p);
+          } else if (err.code === 'NOT_FOUND') {
+            h2.textContent = 'Booking Not Found';
+            container.appendChild(h2);
+            var p2 = document.createElement('p');
+            p2.style.marginTop = '12px';
+            p2.textContent = 'This booking was not found or the link has expired.';
+            container.appendChild(p2);
+          } else {
+            h2.textContent = 'Error';
+            container.appendChild(h2);
+            var p3 = document.createElement('p');
+            p3.style.marginTop = '12px';
+            p3.textContent = err.message || 'An error occurred while cancelling.';
+            container.appendChild(p3);
+          }
+
+          var links = document.createElement('div');
+          links.className = 'confirmation-links';
+          links.style.marginTop = '16px';
+          var a = document.createElement('a');
+          a.href = './';
+          a.textContent = 'Back to scheduling';
+          links.appendChild(a);
+          container.appendChild(links);
+        });
+    })();
+  </script>
+</body>
+</html>

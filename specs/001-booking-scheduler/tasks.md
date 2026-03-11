@@ -66,27 +66,27 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T021 [P] [US1] Unit test for config loader in `tests/frontend/config-loader.test.js` — test YAML parsing of meeting types, locations, settings; test error handling for missing/malformed files
-- [ ] T022 [P] [US1] Unit test for booking form validation in `tests/frontend/booking-form.test.js` — test required field validation (first name, last name, email, format), email format validation, form data extraction
-- [ ] T023 [P] [US1] Unit test for timezone conversion in `tests/frontend/timezone.test.js` — test UTC↔local conversion, timezone detection, date formatting across timezones
-- [ ] T024 [P] [US1] Integration test for calendar operations in `backend/test-calendar.gs` — test finding availability windows by title pattern, test free/busy query across calendars, test slot generation for different durations (15/30/45/60 min)
-- [ ] T025 [P] [US1] Integration test for booking store in `backend/test-booking.gs` — test createBooking writes correct row to Sheet, test getBookingByToken retrieval, test concurrent writes with LockService
-- [ ] T026 [P] [US1] Integration test for email sending in `backend/test-email.gs` — test iCal attachment generation, test confirmation email to owner, test invite email to visitor
-- [ ] T026a [P] [US1] Integration test for concurrent booking in `backend/test-booking.gs` — simulate two simultaneous createBooking calls for the same time slot; verify only one succeeds and the other receives SLOT_TAKEN error
-- [ ] T026b [P] [US1] Unit test for UI state management in `tests/frontend/app-state.test.js` — test step navigation (type → calendar → form → confirm), loading spinner display/hide, error message rendering, back navigation between steps
-- [ ] T026c [P] [US1] Unit test for timezone selector in `tests/frontend/timezone.test.js` — test timezone dropdown rendering, timezone override selection, fallback to default_timezone when Intl API unavailable
+- [x] T021 [P] [US1] Unit test for config loader in `tests/frontend/config-loader.test.js` — test YAML parsing of meeting types, locations, settings; test error handling for missing/malformed files
+- [x] T022 [P] [US1] Unit test for booking form validation in `tests/frontend/booking-form.test.js` — test required field validation (first name, last name, email, format), email format validation, form data extraction
+- [x] T023 [P] [US1] Unit test for timezone conversion in `tests/frontend/timezone.test.js` — test UTC↔local conversion, timezone detection, date formatting across timezones
+- [x] T024 [P] [US1] Integration test for calendar operations in `backend/test-calendar.gs` — test finding availability windows by title pattern, test free/busy query across calendars, test slot generation for different durations (15/30/45/60 min)
+- [x] T025 [P] [US1] Integration test for booking store in `backend/test-booking.gs` — test createBooking writes correct row to Sheet, test getBookingByToken retrieval, test concurrent writes with LockService
+- [x] T026 [P] [US1] Integration test for email sending in `backend/test-email.gs` — test iCal attachment generation, test confirmation email to owner, test invite email to visitor
+- [x] T026a [P] [US1] Integration test for concurrent booking in `backend/test-booking.gs` — simulate two simultaneous createBooking calls for the same time slot; verify only one succeeds and the other receives SLOT_TAKEN error
+- [x] T026b [P] [US1] Unit test for UI state management in `tests/frontend/app-state.test.js` — test step navigation (type → calendar → form → confirm), loading spinner display/hide, error message rendering, back navigation between steps
+- [x] T026c [P] [US1] Unit test for timezone selector in `tests/frontend/timezone.test.js` — test timezone dropdown rendering, timezone override selection, fallback to default_timezone when Intl API unavailable
 
 ### Implementation for User Story 1
 
-- [ ] T027 [US1] Implement calendar availability logic in `backend/Calendar.gs` — getAvailableSlots(startDate, endDate, durationMinutes): find events matching availability_pattern on designated calendar, check free/busy across all calendars via Calendar advanced service, generate available slots of requested duration, enforce min_notice_hours and max_advance_days
-- [ ] T028 [US1] Implement email sending in `backend/Email.gs` — sendBookingConfirmation(booking) sends confirmation email to visitor with iCal (.ics) attachment (for non-Google calendar users) + separate confirmation email to owner; note: the native Google Calendar invite is sent automatically by CalendarApp.createEvent({guests, sendInvites: true}) in T029; buildICalContent(booking) generates valid .ics string; createICalBlob(icsContent) wraps in Blob; sendCancellationEmail(booking) and sendRescheduleEmail(booking, newBooking) stubs for US2/US3
-- [ ] T029 [US1] Implement createBooking handler in `backend/Code.gs` — validate input, re-check slot availability (race condition prevention), acquire lock, create calendar event via CalendarApp.createEvent() with guests/location/description, store booking in Sheet, send emails, return booking with token and cancel/reschedule URLs
-- [ ] T030 [US1] Implement getAvailableSlots handler in `backend/Code.gs` — validate date range, call Calendar.gs, return slots array
-- [ ] T031 [US1] Implement meeting type selection UI in `frontend/js/app.js` — load meeting types from config, render cards/buttons for each type with name, description, duration; on selection advance to calendar step
-- [ ] T032 [US1] Implement calendar slot display in `frontend/js/calendar.js` — initialize FullCalendar with timeGridWeek view, fetch available slots from backend for visible date range, render slots as clickable events, handle week/day navigation and slot selection; apply sage green theme colors
-- [ ] T033 [US1] Implement booking form in `frontend/js/booking-form.js` — render form with first name, last name, email, in-person/virtual dropdown (options from locations.yaml), meeting purpose, additional notes; validate on submit; send createBooking request to backend
-- [ ] T034 [US1] Create confirmation page in `frontend/confirm.html` — display booking details (type, date/time, location, attendee), show cancel and reschedule links; parse booking data from URL params or sessionStorage
-- [ ] T035 [US1] Wire up end-to-end booking flow in `frontend/js/app.js` — step navigation (type → calendar → form → confirm), loading states, error handling, transition animations between steps
+- [x] T027 [US1] Implement calendar availability logic in `backend/Calendar.gs` — getAvailableSlots(startDate, endDate, durationMinutes): find events matching availability_pattern on designated calendar, check free/busy across all calendars via Calendar advanced service, generate available slots of requested duration, enforce min_notice_hours and max_advance_days
+- [x] T028 [US1] Implement email sending in `backend/Email.gs` — sendBookingConfirmation(booking) sends confirmation email to visitor with iCal (.ics) attachment (for non-Google calendar users) + separate confirmation email to owner; note: the native Google Calendar invite is sent automatically by CalendarApp.createEvent({guests, sendInvites: true}) in T029; buildICalContent(booking) generates valid .ics string; createICalBlob(icsContent) wraps in Blob; sendCancellationEmail(booking) and sendRescheduleEmail(booking, newBooking) stubs for US2/US3
+- [x] T029 [US1] Implement createBooking handler in `backend/Code.gs` — validate input, re-check slot availability (race condition prevention), acquire lock, create calendar event via CalendarApp.createEvent() with guests/location/description, store booking in Sheet, send emails, return booking with token and cancel/reschedule URLs
+- [x] T030 [US1] Implement getAvailableSlots handler in `backend/Code.gs` — validate date range, call Calendar.gs, return slots array
+- [x] T031 [US1] Implement meeting type selection UI in `frontend/js/app.js` — load meeting types from config, render cards/buttons for each type with name, description, duration; on selection advance to calendar step
+- [x] T032 [US1] Implement calendar slot display in `frontend/js/calendar.js` — initialize FullCalendar with timeGridWeek view, fetch available slots from backend for visible date range, render slots as clickable events, handle week/day navigation and slot selection; apply sage green theme colors
+- [x] T033 [US1] Implement booking form in `frontend/js/booking-form.js` — render form with first name, last name, email, in-person/virtual dropdown (options from locations.yaml), meeting purpose, additional notes; validate on submit; send createBooking request to backend
+- [x] T034 [US1] Create confirmation page in `frontend/confirm.html` — display booking details (type, date/time, location, attendee), show cancel and reschedule links; parse booking data from URL params or sessionStorage
+- [x] T035 [US1] Wire up end-to-end booking flow in `frontend/js/app.js` — step navigation (type → calendar → form → confirm), loading states, error handling, transition animations between steps
 
 **Checkpoint**: Full booking flow works end-to-end — select type, pick slot, fill form, confirm, event created, emails sent
 
@@ -100,13 +100,13 @@
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T036 [P] [US2] Integration test for cancellation in `backend/test-booking.gs` — test cancelBooking deletes calendar event, updates Sheet status, test already-cancelled token, test invalid token
+- [x] T036 [P] [US2] Integration test for cancellation in `backend/test-booking.gs` — test cancelBooking deletes calendar event, updates Sheet status, test already-cancelled token, test invalid token
 
 ### Implementation for User Story 2
 
-- [ ] T037 [US2] Implement cancelBooking handler in `backend/Code.gs` — validate token, look up booking in Sheet, verify status is "confirmed", delete calendar event by eventId, update booking status to "cancelled" with cancelled_at timestamp, send cancellation emails to both parties
-- [ ] T038 [US2] Implement cancellation email in `backend/Email.gs` — sendCancellationEmail(booking) sends notification to visitor and owner with event details and cancellation confirmation
-- [ ] T039 [US2] Create cancellation page in `frontend/cancel.html` — read token from URL params, call cancelBooking API, display success message or error (already cancelled, invalid token); include link back to scheduling page
+- [x] T037 [US2] Implement cancelBooking handler in `backend/Code.gs` — validate token, look up booking in Sheet, verify status is "confirmed", delete calendar event by eventId, update booking status to "cancelled" with cancelled_at timestamp, send cancellation emails to both parties
+- [x] T038 [US2] Implement cancellation email in `backend/Email.gs` — sendCancellationEmail(booking) sends notification to visitor and owner with event details and cancellation confirmation
+- [x] T039 [US2] Create cancellation page in `frontend/cancel.html` — read token from URL params, call cancelBooking API, display success message or error (already cancelled, invalid token); include link back to scheduling page
 
 **Checkpoint**: Cancel flow works — click link, event deleted, both parties notified
 
@@ -120,14 +120,14 @@
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T040 [P] [US3] Integration test for rescheduling in `backend/test-booking.gs` — test rescheduleBooking cancels old event, creates new event, updates Sheet, test reschedule of already-cancelled booking
+- [x] T040 [P] [US3] Integration test for rescheduling in `backend/test-booking.gs` — test rescheduleBooking cancels old event, creates new event, updates Sheet, test reschedule of already-cancelled booking
 
 ### Implementation for User Story 3
 
-- [ ] T041 [US3] Implement getBooking handler in `backend/Code.gs` — validate token, return booking details (meeting type, visitor info) for pre-filling reschedule form
-- [ ] T042 [US3] Implement rescheduleBooking handler in `backend/Code.gs` — validate oldToken, verify booking is confirmed, check new slot availability, acquire lock, delete old calendar event, create new calendar event, update old booking status to "rescheduled" with rescheduled_to pointer, create new booking row, send reschedule emails
-- [ ] T043 [US3] Implement reschedule email in `backend/Email.gs` — sendRescheduleEmail(oldBooking, newBooking) sends notification to both parties with old and new time details
-- [ ] T044 [US3] Create reschedule page in `frontend/reschedule.html` — read token from URL params, call getBooking API to get meeting type, load calendar with available slots for that duration, on slot selection call rescheduleBooking API, display confirmation or error
+- [x] T041 [US3] Implement getBooking handler in `backend/Code.gs` — validate token, return booking details (meeting type, visitor info) for pre-filling reschedule form
+- [x] T042 [US3] Implement rescheduleBooking handler in `backend/Code.gs` — validate oldToken, verify booking is confirmed, check new slot availability, acquire lock, delete old calendar event, create new calendar event, update old booking status to "rescheduled" with rescheduled_to pointer, create new booking row, send reschedule emails
+- [x] T043 [US3] Implement reschedule email in `backend/Email.gs` — sendRescheduleEmail(oldBooking, newBooking) sends notification to both parties with old and new time details
+- [x] T044 [US3] Create reschedule page in `frontend/reschedule.html` — read token from URL params, call getBooking API to get meeting type, load calendar with available slots for that duration, on slot selection call rescheduleBooking API, display confirmation or error
 
 **Checkpoint**: Reschedule flow works — click link, pick new time, old event removed, new event created, both parties notified
 
@@ -141,8 +141,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T045 [US4] Add YAML validation to config loader in `frontend/js/config-loader.js` — validate meeting type schema (required: id, name, duration, description; optional: instructions), log warnings for invalid entries, gracefully skip malformed types
-- [ ] T046 [US4] Add meeting type documentation to `README.md` — document YAML schema for meeting-types.yaml with all fields, provide examples, explain how to add/remove/modify types
+- [x] T045 [US4] Add YAML validation to config loader in `frontend/js/config-loader.js` — validate meeting type schema (required: id, name, duration, description; optional: instructions), log warnings for invalid entries, gracefully skip malformed types
+- [x] T046 [US4] Add meeting type documentation to `README.md` — document YAML schema for meeting-types.yaml with all fields, provide examples, explain how to add/remove/modify types
 
 **Checkpoint**: Meeting types are fully configurable via YAML with validation and documentation
 
@@ -156,8 +156,8 @@
 
 ### Implementation for User Story 5
 
-- [ ] T047 [US5] Add YAML validation to config loader in `frontend/js/config-loader.js` — validate location schema (required: id, label, value), log warnings for invalid entries
-- [ ] T048 [US5] Add location documentation to `README.md` — document YAML schema for locations.yaml with all fields, provide examples for virtual (Zoom, Teams, etc.) and in-person options
+- [x] T047 [US5] Add YAML validation to config loader in `frontend/js/config-loader.js` — validate location schema (required: id, label, value), log warnings for invalid entries
+- [x] T048 [US5] Add location documentation to `README.md` — document YAML schema for locations.yaml with all fields, provide examples for virtual (Zoom, Teams, etc.) and in-person options
 
 **Checkpoint**: Locations are fully configurable via YAML with validation and documentation
 
@@ -167,18 +167,18 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T049 [P] Create comprehensive `README.md` in repository root — project overview, features list, screenshots placeholder, link to quickstart.md for setup instructions, link to specs for technical details
+- [x] T049 [P] Create comprehensive `README.md` in repository root — project overview, features list, screenshots placeholder, link to quickstart.md for setup instructions, link to specs for technical details
 - [ ] T050 [P] Create `docs/setup-guide.md` — step-by-step Google Apps Script setup (create project, enable Calendar API, set script properties, deploy as web app); GATE: every instruction MUST be verified by fetching the current Google Apps Script documentation URLs via web search/fetch before finalizing — never assume or hallucinate steps
 - [ ] T051 [P] Create `docs/google-account-setup.md` — how to create/configure a Google account for this project, enable APIs, create OAuth consent screen if needed; GATE: every instruction MUST be verified by fetching current Google Cloud Console documentation URLs via web search/fetch before finalizing
-- [ ] T052 Add input sanitization to all backend handlers in `backend/Code.gs` — escape HTML in user inputs, validate email format server-side, enforce string length limits
-- [ ] T053 Add rate limiting to backend in `backend/Code.gs` — track requests per IP/session in Sheet or CacheService, reject excessive requests with friendly error
-- [ ] T054 [P] Add mobile-responsive CSS in `frontend/css/styles.css` — media queries for mobile/tablet, touch-friendly slot selection, responsive form layout
-- [ ] T055 [P] Create end-to-end test script in `tests/e2e/booking-flow.test.js` — automated test that exercises full booking → cancel → reschedule flow against live backend
-- [ ] T056 Add error boundary and offline handling in `frontend/js/app.js` — graceful error messages for network failures, Apps Script timeouts, and calendar unavailability
-- [ ] T057 Run quickstart.md validation — follow every step in quickstart.md on a fresh setup to verify accuracy; update any incorrect instructions
-- [ ] T058 [P] Add GitHub Pages deployment configuration — ensure correct directory structure for Pages deployment, add GitHub Actions workflow if needed for build step
-- [ ] T059 Security hardening — verify CORS origin checking in Apps Script, ensure tokens are UUID v4 with expiry, verify no secrets in committed files, add Content-Security-Policy headers to HTML
-- [ ] T060 [P] Accessibility pass in `frontend/` — add ARIA labels to form inputs, calendar navigation, and step indicators; ensure keyboard navigation works for slot selection and form submission; verify color contrast meets WCAG AA for sage green theme
+- [x] T052 Add input sanitization to all backend handlers in `backend/Code.gs` — escape HTML in user inputs, validate email format server-side, enforce string length limits
+- [x] T053 Add rate limiting to backend in `backend/Code.gs` — track requests per IP/session in Sheet or CacheService, reject excessive requests with friendly error
+- [x] T054 [P] Add mobile-responsive CSS in `frontend/css/styles.css` — media queries for mobile/tablet, touch-friendly slot selection, responsive form layout
+- [x] T055 [P] Create end-to-end test script in `tests/e2e/booking-flow.test.js` — automated test that exercises full booking → cancel → reschedule flow against live backend
+- [x] T056 Add error boundary and offline handling in `frontend/js/app.js` — graceful error messages for network failures, Apps Script timeouts, and calendar unavailability
+- [x] T057 Run quickstart.md validation — follow every step in quickstart.md on a fresh setup to verify accuracy; update any incorrect instructions
+- [x] T058 [P] Add GitHub Pages deployment configuration — ensure correct directory structure for Pages deployment, add GitHub Actions workflow if needed for build step
+- [x] T059 Security hardening — verify CORS origin checking in Apps Script, ensure tokens are UUID v4 with expiry, verify no secrets in committed files, add Content-Security-Policy headers to HTML
+- [x] T060 [P] Accessibility pass in `frontend/` — add ARIA labels to form inputs, calendar navigation, and step indicators; ensure keyboard navigation works for slot selection and form submission; verify color contrast meets WCAG AA for sage green theme
 
 ---
 

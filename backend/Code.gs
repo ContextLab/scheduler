@@ -38,6 +38,16 @@ function doPost(e) {
     return jsonResponse({ success: false, error: 'MISSING_ACTION', message: 'Request must include an action field' });
   }
 
+  // Rate limiting via CacheService
+  var clientId = requestData.clientId || 'anonymous';
+  var cacheKey = 'rate_' + clientId;
+  var cache = CacheService.getScriptCache();
+  var requestCount = parseInt(cache.get(cacheKey) || '0', 10);
+  if (requestCount >= 30) {
+    return jsonResponse({ success: false, error: 'RATE_LIMITED', message: 'Too many requests. Please wait a minute and try again.' });
+  }
+  cache.put(cacheKey, String(requestCount + 1), 60); // 60-second window
+
   try {
     switch (action) {
       case 'getAvailableSlots':
