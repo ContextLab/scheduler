@@ -218,6 +218,14 @@ token.json
 *.credentials
 *.secret
 
+# Apps Script setup (contains PII and resource IDs)
+backend/Setup.gs
+backend/.clasp.json
+
+# OMC tool state
+.omc/
+**/.omc/
+
 # OS
 .DS_Store
 Thumbs.db
