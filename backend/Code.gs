@@ -16,6 +16,16 @@ function doGet(e) {
     });
   }
 
+  if (action === 'cleanup') {
+    var key = (e && e.parameter && e.parameter.key) || '';
+    var cleanupKey = Config.get('CLEANUP_KEY');
+    if (!cleanupKey || key !== cleanupKey) {
+      return jsonResponse({ success: false, error: 'UNAUTHORIZED', message: 'Invalid cleanup key' });
+    }
+    var deleted = BookingStore.deleteOldBookings(30);
+    return jsonResponse({ success: true, deleted: deleted });
+  }
+
   return jsonResponse({ success: false, error: 'UNKNOWN_ACTION', message: 'Unknown action: ' + action });
 }
 

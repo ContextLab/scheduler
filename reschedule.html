@@ -112,7 +112,7 @@
             allDaySlot: false,
             slotMinTime: '07:00:00',
             slotMaxTime: '21:00:00',
-            timeZone: TimezoneUtil.getTimezone(),
+            timeZone: 'local',
             height: 'auto',
             nowIndicator: true,
             events: function (info, successCb, failureCb) {
@@ -123,9 +123,13 @@
                       title: 'Available',
                       start: s.start,
                       end: s.end,
-                      backgroundColor: '#9EC5B3',
-                      borderColor: '#6EA890',
+                      backgroundColor: 'rgba(0, 112, 60, 0.15)',
+                      borderColor: 'rgb(0, 112, 60)',
                       textColor: '#2D3436',
+                      extendedProps: {
+                        utcStart: s.start,
+                        utcEnd: s.end,
+                      },
                     };
                   }));
                 })
@@ -135,8 +139,8 @@
                 });
             },
             eventClick: function (info) {
-              var newStart = info.event.startStr;
-              var newEnd = info.event.endStr;
+              var newStart = info.event.extendedProps.utcStart;
+              var newEnd = info.event.extendedProps.utcEnd;
               if (!confirm('Reschedule to ' + TimezoneUtil.formatDateTime(newStart) + '?')) return;
 
               loading.classList.add('visible');

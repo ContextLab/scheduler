@@ -1,0 +1,25 @@
+name: Cleanup Old Bookings
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Sunday at midnight UTC
+  workflow_dispatch: {}   # Allow manual trigger
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete bookings older than 30 days
+        env:
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+          CLEANUP_KEY: ${{ secrets.CLEANUP_KEY }}
+        run: |
+          RESPONSE=$(curl -s -L "${APPS_SCRIPT_URL}?action=cleanup&key=${CLEANUP_KEY}")
+          echo "Response: $RESPONSE"
+          SUCCESS=$(echo "$RESPONSE" | jq -r '.success')
+          if [ "$SUCCESS" != "true" ]; then
+            echo "Cleanup failed"
+            exit 1
+          fi
+          DELETED=$(echo "$RESPONSE" | jq -r '.deleted')
+          echo "Deleted $DELETED old bookings"

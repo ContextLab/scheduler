@@ -26,7 +26,7 @@ var CalendarUI = (function () {
       slotMinTime: '07:00:00',
       slotMaxTime: '21:00:00',
       slotDuration: minutesToSlotDuration(durationMinutes),
-      timeZone: TimezoneUtil.getTimezone(),
+      timeZone: 'local',
       height: 'auto',
       nowIndicator: true,
       selectable: false,
@@ -35,8 +35,8 @@ var CalendarUI = (function () {
       eventClick: function (info) {
         if (_onSlotSelected) {
           _onSlotSelected({
-            start: info.event.startStr,
-            end: info.event.endStr,
+            start: info.event.extendedProps.utcStart,
+            end: info.event.extendedProps.utcEnd,
           });
         }
       },
@@ -80,6 +80,10 @@ var CalendarUI = (function () {
             borderColor: '#6EA890',
             textColor: '#2D3436',
             display: 'block',
+            extendedProps: {
+              utcStart: slot.start,
+              utcEnd: slot.end,
+            },
           };
         });
 
@@ -124,7 +128,6 @@ var CalendarUI = (function () {
 
   function refresh() {
     if (_calendar) {
-      _calendar.setOption('timeZone', TimezoneUtil.getTimezone());
       _calendar.refetchEvents();
     }
   }

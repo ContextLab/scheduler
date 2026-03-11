@@ -101,11 +101,35 @@ var BookingStore = (function () {
     return bookings;
   }
 
+  function deleteOldBookings(olderThanDays) {
+    var sheet = getSheet();
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return 0;
+
+    var headerRow = data[0];
+    var startTimeCol = headerRow.indexOf('startTime');
+    if (startTimeCol === -1) return 0;
+
+    var cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
+    var deletedCount = 0;
+
+    // Walk rows bottom-up so deleting doesn't shift indices
+    for (var i = data.length - 1; i >= 1; i--) {
+      var startTime = new Date(data[i][startTimeCol]);
+      if (startTime < cutoff) {
+        sheet.deleteRow(i + 1); // 1-indexed
+        deletedCount++;
+      }
+    }
+    return deletedCount;
+  }
+
   return {
     create: create,
     getByToken: getByToken,
     updateStatus: updateStatus,
     getAll: getAll,
+    deleteOldBookings: deleteOldBookings,
     HEADERS: HEADERS,
   };
 })();
