@@ -168,8 +168,8 @@
 **Purpose**: Improvements that affect multiple user stories
 
 - [x] T049 [P] Create comprehensive `README.md` in repository root — project overview, features list, screenshots placeholder, link to quickstart.md for setup instructions, link to specs for technical details
-- [ ] T050 [P] Create `docs/setup-guide.md` — step-by-step Google Apps Script setup (create project, enable Calendar API, set script properties, deploy as web app); GATE: every instruction MUST be verified by fetching the current Google Apps Script documentation URLs via web search/fetch before finalizing — never assume or hallucinate steps
-- [ ] T051 [P] Create `docs/google-account-setup.md` — how to create/configure a Google account for this project, enable APIs, create OAuth consent screen if needed; GATE: every instruction MUST be verified by fetching current Google Cloud Console documentation URLs via web search/fetch before finalizing
+- [x] T050 [P] Create `docs/setup-guide.md` — step-by-step Google Apps Script setup (create project, enable Calendar API, set script properties, deploy as web app); GATE: every instruction MUST be verified by fetching the current Google Apps Script documentation URLs via web search/fetch before finalizing — never assume or hallucinate steps
+- [x] T051 [P] Create `docs/google-account-setup.md` — how to create/configure a Google account for this project, enable APIs, create OAuth consent screen if needed; GATE: every instruction MUST be verified by fetching current Google Cloud Console documentation URLs via web search/fetch before finalizing
 - [x] T052 Add input sanitization to all backend handlers in `backend/Code.gs` — escape HTML in user inputs, validate email format server-side, enforce string length limits
 - [x] T053 Add rate limiting to backend in `backend/Code.gs` — track requests per IP/session in Sheet or CacheService, reject excessive requests with friendly error
 - [x] T054 [P] Add mobile-responsive CSS in `frontend/css/styles.css` — media queries for mobile/tablet, touch-friendly slot selection, responsive form layout
