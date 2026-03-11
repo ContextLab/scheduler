@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" font-family="'Nunito Sans', sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto-start-reverse">
+      <polygon points="0 0, 8 3, 0 6" fill="#007030"/>
+    </marker>
+  </defs>
+
+  <!-- GitHub Pages Box -->
+  <rect x="40" y="40" width="240" height="210" rx="10" fill="none" stroke="#007030" stroke-width="1.5"/>
+  <rect x="40" y="40" width="240" height="36" rx="10" fill="#007030"/>
+  <rect x="40" y="66" width="240" height="10" fill="#007030"/>
+  <text x="160" y="64" text-anchor="middle" fill="white" font-size="14" font-weight="300" letter-spacing="0.6">github pages</text>
+  <text x="60" y="100" fill="#007030" font-size="11" font-weight="600">static frontend</text>
+  <text x="70" y="122" fill="#444" font-size="11" font-weight="300">HTML / CSS / JS</text>
+  <text x="70" y="140" fill="#444" font-size="11" font-weight="300">FullCalendar</text>
+  <text x="70" y="158" fill="#444" font-size="11" font-weight="300">YAML config (js-yaml)</text>
+  <text x="70" y="176" fill="#444" font-size="11" font-weight="300">booking form</text>
+  <text x="70" y="194" fill="#444" font-size="11" font-weight="300">reschedule / cancel pages</text>
+  <text x="70" y="212" fill="#444" font-size="11" font-weight="300">timezone selector</text>
+
+  <!-- Apps Script Box -->
+  <rect x="520" y="40" width="240" height="210" rx="10" fill="none" stroke="#007030" stroke-width="1.5"/>
+  <rect x="520" y="40" width="240" height="36" rx="10" fill="#007030"/>
+  <rect x="520" y="66" width="240" height="10" fill="#007030"/>
+  <text x="640" y="64" text-anchor="middle" fill="white" font-size="14" font-weight="300" letter-spacing="0.6">google apps script</text>
+  <text x="540" y="100" fill="#007030" font-size="11" font-weight="600">serverless backend</text>
+  <text x="550" y="122" fill="#444" font-size="11" font-weight="300">Code.gs — request router</text>
+  <text x="550" y="140" fill="#444" font-size="11" font-weight="300">Calendar.gs — slot detection</text>
+  <text x="550" y="158" fill="#444" font-size="11" font-weight="300">Booking.gs — data store</text>
+  <text x="550" y="176" fill="#444" font-size="11" font-weight="300">Email.gs — notifications</text>
+  <text x="550" y="194" fill="#444" font-size="11" font-weight="300">Token.gs — secure links</text>
+  <text x="550" y="212" fill="#444" font-size="11" font-weight="300">Config.gs — settings</text>
+
+  <!-- Arrows: Frontend <-> Backend -->
+  <line x1="280" y1="125" x2="520" y2="125" stroke="#007030" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="400" y="118" text-anchor="middle" fill="#007030" font-size="10" font-weight="300" letter-spacing="0.4">HTTPS fetch</text>
+
+  <line x1="520" y1="155" x2="280" y2="155" stroke="#007030" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="400" y="175" text-anchor="middle" fill="#007030" font-size="10" font-weight="300" letter-spacing="0.4">JSON responses</text>
+
+  <!-- Google Workspace Box -->
+  <rect x="400" y="340" width="240" height="140" rx="10" fill="none" stroke="#007030" stroke-width="1.5"/>
+  <rect x="400" y="340" width="240" height="36" rx="10" fill="#007030"/>
+  <rect x="400" y="366" width="240" height="10" fill="#007030"/>
+  <text x="520" y="364" text-anchor="middle" fill="white" font-size="14" font-weight="300" letter-spacing="0.6">google workspace</text>
+  <text x="430" y="400" fill="#444" font-size="11" font-weight="300">Google Calendar</text>
+  <text x="430" y="420" fill="#444" font-size="11" font-weight="300">Gmail (MailApp)</text>
+  <text x="430" y="440" fill="#444" font-size="11" font-weight="300">Google Sheets (booking store)</text>
+
+  <!-- Arrow: Backend -> Google Workspace -->
+  <path d="M 640 250 L 640 310 L 545 310 L 545 340" stroke="#007030" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <text x="658" y="290" fill="#007030" font-size="10" font-weight="300" letter-spacing="0.4">Google API</text>
+
+  <!-- GitHub Actions Box -->
+  <rect x="40" y="360" width="200" height="100" rx="10" fill="none" stroke="#007030" stroke-width="1.5"/>
+  <rect x="40" y="360" width="200" height="36" rx="10" fill="#007030"/>
+  <rect x="40" y="386" width="200" height="10" fill="#007030"/>
+  <text x="140" y="384" text-anchor="middle" fill="white" font-size="14" font-weight="300" letter-spacing="0.6">github actions</text>
+  <text x="60" y="418" fill="#444" font-size="11" font-weight="300">cleanup workflow</text>
+  <text x="60" y="436" fill="#444" font-size="11" font-weight="300">weekly booking cleanup</text>
+
+  <!-- Arrow: GitHub Actions -> Google Workspace -->
+  <line x1="240" y1="410" x2="400" y2="410" stroke="#007030" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrow)"/>
+  <text x="320" y="402" text-anchor="middle" fill="#007030" font-size="10" font-weight="300" letter-spacing="0.4">cleanup API call</text>
+</svg>

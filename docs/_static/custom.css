@@ -1,0 +1,46 @@
+/* ContextLab branding overrides for Furo theme */
+
+/* Import Nunito Sans from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700&display=swap');
+
+/* Apply Nunito Sans globally */
+body {
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+/* Heading styles — lowercase aesthetic with letter-spacing */
+h1, h2, h3, h4, h5, h6,
+.sidebar-title,
+.toctree-l1 > a {
+    font-family: 'Nunito Sans', sans-serif;
+    text-transform: lowercase;
+    letter-spacing: 0.6px;
+    font-weight: 300;
+}
+
+/* ContextLab green accent color */
+a {
+    color: #007030;
+}
+
+a:hover {
+    color: #005524;
+}
+
+/* Sidebar branding */
+.sidebar-brand-text {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 300;
+    letter-spacing: 0.6px;
+}
+
+/* Code block styling */
+pre {
+    border-radius: 4px;
+}
+
+/* Admonition accent */
+.admonition.tip > .admonition-title,
+.admonition.note > .admonition-title {
+    background-color: rgba(0, 112, 48, 0.1);
+}
