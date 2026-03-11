@@ -151,6 +151,11 @@ function handleCreateBooking(data) {
       return jsonResponse({ success: false, error: 'SLOT_TAKEN', message: 'This time slot is no longer available. Please select another time.' });
     }
 
+    // Generate token first so it's available for the event description
+    var token = TokenService.generateToken();
+    var pagesUrl = Config.get('GITHUB_PAGES_URL');
+    data.token = token;
+
     // Create calendar event
     var eventTitle = data.meetingTypeName + ' — ' + data.firstName + ' ' + data.lastName;
     var description = buildEventDescription(data);
@@ -161,10 +166,6 @@ function handleCreateBooking(data) {
       location: data.location,
       description: description,
     });
-
-    // Generate token and store booking
-    var token = TokenService.generateToken();
-    var pagesUrl = Config.get('GITHUB_PAGES_URL');
     var bookingRecord = {
       token: token,
       tokenExpiresAt: TokenService.getExpiryDate(),
@@ -338,9 +339,21 @@ function handleRescheduleBooking(data) {
       Logger.log('Error deleting old event during reschedule: ' + err.message);
     }
 
-    // Create new calendar event
+    // Generate new token first so it's available for the event description
+    var newToken = TokenService.generateToken();
+    var pagesUrl = Config.get('GITHUB_PAGES_URL');
+
+    // Create new calendar event with the new token in the description
+    var descData = {
+      token: newToken,
+      firstName: oldBooking.firstName,
+      lastName: oldBooking.lastName,
+      email: oldBooking.email,
+      purpose: oldBooking.purpose,
+      notes: oldBooking.notes,
+    };
     var eventTitle = oldBooking.meetingTypeId + ' — ' + oldBooking.firstName + ' ' + oldBooking.lastName;
-    var description = buildEventDescription(oldBooking);
+    var description = buildEventDescription(descData);
     var calendar = CalendarApp.getCalendarById(Config.get('CALENDAR_ID'));
     var newEvent = calendar.createEvent(eventTitle, newStart, newEnd, {
       guests: oldBooking.email,
@@ -348,10 +361,6 @@ function handleRescheduleBooking(data) {
       location: oldBooking.location,
       description: description,
     });
-
-    // Generate new token
-    var newToken = TokenService.generateToken();
-    var pagesUrl = Config.get('GITHUB_PAGES_URL');
 
     var newBookingRecord = {
       token: newToken,

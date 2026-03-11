@@ -134,6 +134,7 @@
 
           var containerEl = document.getElementById('calendar-container');
           calendar = new FullCalendar.Calendar(containerEl, {
+            initialDate: booking.start,
             initialView: 'timeGridWeek',
             headerToolbar: {
               left: 'prev,next today',
