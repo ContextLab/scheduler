@@ -96,16 +96,23 @@ var CalendarService = (function () {
    */
   function getAllBusyTimes(startDate, endDate) {
     var busyTimes = [];
+    var designatedCalId = Config.get('CALENDAR_ID');
+    var pattern = Config.get('AVAILABILITY_PATTERN');
+
+    // Add busy times from the designated calendar (non-availability events only)
+    busyTimes = busyTimes.concat(
+      getDesignatedCalendarBusyTimes(designatedCalId, pattern, startDate, endDate)
+    );
 
     try {
-      // Use Calendar Advanced Service for freeBusy query
+      // Use Calendar Advanced Service for freeBusy query on OTHER calendars
       var calendars = CalendarApp.getAllCalendars();
-      var calendarIds = calendars.map(function (cal) {
-        return { id: cal.getId() };
-      });
+      var calendarIds = calendars
+        .filter(function (cal) { return cal.getId() !== designatedCalId; })
+        .map(function (cal) { return { id: cal.getId() }; });
 
       if (calendarIds.length === 0) {
-        return busyTimes;
+        return mergePeriods(busyTimes);
       }
 
       var request = {
@@ -131,8 +138,10 @@ var CalendarService = (function () {
       }
     } catch (e) {
       Logger.log('FreeBusy query failed, falling back to event scan: ' + e.message);
-      // Fallback: scan events on all calendars
-      busyTimes = getAllBusyTimesFallback(startDate, endDate);
+      // Fallback: scan events on all non-designated calendars
+      busyTimes = busyTimes.concat(
+        getAllBusyTimesFallback(startDate, endDate, designatedCalId)
+      );
     }
 
     // Sort and merge overlapping busy periods
@@ -140,13 +149,44 @@ var CalendarService = (function () {
   }
 
   /**
+   * Get busy times from the designated calendar, excluding availability window events.
+   */
+  function getDesignatedCalendarBusyTimes(calendarId, pattern, startDate, endDate) {
+    var calendar = CalendarApp.getCalendarById(calendarId);
+    if (!calendar) return [];
+
+    var events = calendar.getEvents(startDate, endDate);
+    var busyTimes = [];
+    var patternLower = pattern.toLowerCase();
+
+    for (var i = 0; i < events.length; i++) {
+      var title = events[i].getTitle().toLowerCase();
+      // Skip availability window events — they define free time, not busy time
+      if (title.indexOf(patternLower) !== -1) continue;
+      // Skip events the user has declined
+      var myStatus = events[i].getMyStatus();
+      if (myStatus === CalendarApp.GuestStatus.NO) continue;
+
+      busyTimes.push({
+        start: events[i].getStartTime().getTime(),
+        end: events[i].getEndTime().getTime(),
+      });
+    }
+
+    return busyTimes;
+  }
+
+  /**
    * Fallback: scan events on all calendars when Advanced Service unavailable.
    */
-  function getAllBusyTimesFallback(startDate, endDate) {
+  function getAllBusyTimesFallback(startDate, endDate, excludeCalId) {
     var calendars = CalendarApp.getAllCalendars();
     var busyTimes = [];
 
     for (var i = 0; i < calendars.length; i++) {
+      // Skip the designated calendar (handled separately)
+      if (excludeCalId && calendars[i].getId() === excludeCalId) continue;
+
       var events = calendars[i].getEvents(startDate, endDate);
       for (var j = 0; j < events.length; j++) {
         // Skip events the user has declined
