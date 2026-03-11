@@ -94,6 +94,37 @@
           loading.classList.remove('visible');
           booking = result.booking;
 
+          if (booking.status === 'cancelled') {
+            bookingInfo.textContent = '';
+            var h2 = document.createElement('h2');
+            h2.style.color = '#D63031';
+            h2.textContent = 'Booking Cancelled';
+            content.appendChild(h2);
+            var p = document.createElement('p');
+            p.textContent = 'This booking has been cancelled and cannot be rescheduled.';
+            content.appendChild(p);
+            var links = document.createElement('div');
+            links.className = 'confirmation-links';
+            links.style.marginTop = '16px';
+            var a = document.createElement('a');
+            a.href = './';
+            a.textContent = 'Book a new meeting';
+            links.appendChild(a);
+            content.appendChild(links);
+            return;
+          }
+
+          if (booking.status === 'rescheduled') {
+            bookingInfo.textContent = '';
+            var h2r = document.createElement('h2');
+            h2r.textContent = 'Already Rescheduled';
+            content.appendChild(h2r);
+            var pr = document.createElement('p');
+            pr.textContent = 'This booking has already been rescheduled. Please use the link from your latest confirmation email.';
+            content.appendChild(pr);
+            return;
+          }
+
           bookingInfo.textContent = 'Rescheduling: ' + booking.meetingTypeId +
             ' (currently ' + TimezoneUtil.formatDateTime(booking.start) + ')' +
             ' — Select a new time below';
