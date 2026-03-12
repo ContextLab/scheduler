@@ -4,7 +4,7 @@
 [![GitHub Pages](https://img.shields.io/website?url=https%3A%2F%2Fcontextlab.github.io%2Fscheduler&label=demo)](https://contextlab.github.io/scheduler)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A self-hosted scheduling application inspired by YouCanBook.me, running as a static GitHub Pages frontend with a free Google Apps Script backend.
+A self-hosted scheduling application inspired by YouCanBook.me and Calendly, running as a static GitHub Pages frontend with a free Google Apps Script backend.
 
 ## Features
 
