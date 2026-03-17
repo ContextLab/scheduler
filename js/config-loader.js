@@ -38,7 +38,7 @@ const ConfigLoader = (function () {
       return [];
     }
     return data.meeting_types.filter(function (mt) {
-      var valid = mt.id && mt.name && mt.duration && mt.description;
+      var valid = mt.id && mt.name && mt.description;
       if (!valid) {
         console.warn('meeting-types.yaml: skipping invalid entry:', mt);
       }

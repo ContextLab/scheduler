@@ -1,13 +1,22 @@
 /**
  * App — main application orchestrator.
- * Manages step navigation, loading states, error display, and wires up the booking flow.
+ * Manages 5-step navigation, loading states, error display, and wires up the booking flow.
+ * Steps: 1. Meeting Type → 2. Duration → 3. Date & Time → 4. Your Details → 5. Confirmation
  */
 
 var App = (function () {
   var _currentStep = 1;
   var _selectedType = null;
+  var _selectedDuration = null;
   var _selectedSlot = null;
   var _errorTimeout = null;
+
+  var DURATION_OPTIONS = [
+    { minutes: 15, label: '15', unit: 'min' },
+    { minutes: 30, label: '30', unit: 'min' },
+    { minutes: 45, label: '45', unit: 'min' },
+    { minutes: 60, label: '1', unit: 'hr' },
+  ];
 
   function init() {
     ConfigLoader.loadAll()
@@ -28,7 +37,11 @@ var App = (function () {
           goToStep(1);
         });
         document.getElementById('back-to-step-2').addEventListener('click', function () {
+          _selectedDuration = null;
           goToStep(2);
+        });
+        document.getElementById('back-to-step-3').addEventListener('click', function () {
+          goToStep(3);
         });
 
         // Set up booking form
@@ -56,8 +69,8 @@ var App = (function () {
 
     select.addEventListener('change', function () {
       TimezoneUtil.setTimezone(select.value);
-      // Re-render calendar if on step 2
-      if (_currentStep === 2 && _selectedType) {
+      // Re-render calendar if on step 3
+      if (_currentStep === 3 && _selectedDuration) {
         CalendarUI.refresh();
       }
     });
@@ -72,28 +85,16 @@ var App = (function () {
       card.className = 'meeting-type-card';
       card.tabIndex = 0;
       card.setAttribute('role', 'button');
-      card.setAttribute('aria-label', type.name + ', ' + type.duration + ' minutes');
+      card.setAttribute('aria-label', type.name);
 
       var h3 = document.createElement('h3');
       h3.textContent = type.name;
       card.appendChild(h3);
 
-      var duration = document.createElement('div');
-      duration.className = 'duration';
-      duration.textContent = type.duration + ' minutes';
-      card.appendChild(duration);
-
       var desc = document.createElement('div');
       desc.className = 'description';
       desc.textContent = type.description;
       card.appendChild(desc);
-
-      if (type.instructions) {
-        var instr = document.createElement('div');
-        instr.className = 'instructions';
-        instr.textContent = type.instructions;
-        card.appendChild(instr);
-      }
 
       card.addEventListener('click', function () {
         selectMeetingType(type);
@@ -111,24 +112,84 @@ var App = (function () {
 
   function selectMeetingType(type) {
     _selectedType = type;
-    document.getElementById('selected-type-info').textContent =
-      type.name + ' (' + type.duration + ' min)';
+    document.getElementById('selected-type-info').textContent = type.name;
+    renderDurationOptions();
     goToStep(2);
-    CalendarUI.init(type.duration, onSlotSelected);
+  }
+
+  function renderDurationOptions() {
+    var container = document.getElementById('duration-options');
+    container.textContent = '';
+
+    DURATION_OPTIONS.forEach(function (opt) {
+      var card = document.createElement('div');
+      card.className = 'duration-card';
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', opt.label + ' ' + opt.unit);
+
+      var value = document.createElement('div');
+      value.className = 'duration-value';
+      value.textContent = opt.label;
+      card.appendChild(value);
+
+      var label = document.createElement('div');
+      label.className = 'duration-label';
+      label.textContent = opt.unit;
+      card.appendChild(label);
+
+      card.addEventListener('click', function () {
+        selectDuration(opt.minutes);
+      });
+      card.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          selectDuration(opt.minutes);
+        }
+      });
+
+      container.appendChild(card);
+    });
+  }
+
+  function selectDuration(minutes) {
+    _selectedDuration = minutes;
+    var durationLabel = minutes === 60 ? '1 hr' : minutes + ' min';
+    document.getElementById('selected-duration-info').textContent =
+      _selectedType.name + ' \u2014 ' + durationLabel;
+    goToStep(3);
+    CalendarUI.init(minutes, onSlotSelected);
   }
 
   function onSlotSelected(slot) {
     _selectedSlot = slot;
+    var durationLabel = _selectedDuration === 60 ? '1 hr' : _selectedDuration + ' min';
     document.getElementById('selected-slot-info').textContent =
-      _selectedType.name + ' — ' +
+      _selectedType.name + ' (' + durationLabel + ') \u2014 ' +
       TimezoneUtil.formatDateTime(slot.start) + ' (' +
       TimezoneUtil.getTimezoneAbbreviation() + ')';
-    goToStep(3);
+
+    // Show or hide instruction banner
+    var banner = document.getElementById('instruction-banner');
+    if (_selectedType.instructions) {
+      banner.textContent = '';
+      var icon = document.createElement('span');
+      icon.className = 'instruction-icon';
+      icon.textContent = '\u2139';
+      banner.appendChild(icon);
+      banner.appendChild(document.createTextNode(_selectedType.instructions));
+      banner.classList.add('visible');
+    } else {
+      banner.textContent = '';
+      banner.classList.remove('visible');
+    }
+
+    goToStep(4);
   }
 
   function goToStep(step) {
     // Hide all steps
-    for (var i = 1; i <= 4; i++) {
+    for (var i = 1; i <= 5; i++) {
       var section = document.getElementById('step-' + i);
       section.classList.remove('active');
     }
@@ -188,8 +249,8 @@ var App = (function () {
   }
 
   function submitBooking(formData) {
-    if (!_selectedType || !_selectedSlot) {
-      showError('Please select a meeting type and time slot first.');
+    if (!_selectedType || !_selectedDuration || !_selectedSlot) {
+      showError('Please select a meeting type, duration, and time slot first.');
       return;
     }
 
@@ -201,6 +262,7 @@ var App = (function () {
     var bookingData = {
       meetingTypeId: _selectedType.id,
       meetingTypeName: _selectedType.name,
+      duration: _selectedDuration,
       start: _selectedSlot.start,
       end: _selectedSlot.end,
       firstName: formData.firstName,
@@ -218,13 +280,13 @@ var App = (function () {
       .then(function (result) {
         hideLoading();
         showConfirmation(result.booking, bookingData);
-        goToStep(4);
+        goToStep(5);
       })
       .catch(function (err) {
         hideLoading();
         if (err.code === 'SLOT_TAKEN') {
           showError('This time slot was just taken. Please select another time.', 5000);
-          goToStep(2);
+          goToStep(3);
           CalendarUI.refresh();
         } else {
           showError(err.message || 'Failed to create booking. Please try again.', 8000);
@@ -251,10 +313,12 @@ var App = (function () {
     var details = document.createElement('dl');
     details.className = 'confirmation-details';
 
+    var durationLabel = _selectedDuration === 60 ? '1 hr' : _selectedDuration + ' min';
+
     var fields = [
       { label: 'Meeting Type', value: _selectedType.name },
+      { label: 'Duration', value: durationLabel },
       { label: 'Date & Time', value: TimezoneUtil.formatDateTime(booking.start) + ' (' + TimezoneUtil.getTimezoneAbbreviation() + ')' },
-      { label: 'Duration', value: _selectedType.duration + ' minutes' },
       { label: 'Format', value: formData.format },
       { label: 'Location', value: formData.location },
       { label: 'Name', value: formData.firstName + ' ' + formData.lastName },
@@ -322,6 +386,7 @@ var App = (function () {
     hideError: hideError,
     submitBooking: submitBooking,
     getSelectedType: function () { return _selectedType; },
+    getSelectedDuration: function () { return _selectedDuration; },
     getSelectedSlot: function () { return _selectedSlot; },
   };
 })();
