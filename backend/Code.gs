@@ -157,7 +157,9 @@ function handleCreateBooking(data) {
     data.token = token;
 
     // Create calendar event
-    var eventTitle = data.meetingTypeName + ' — ' + data.firstName + ' ' + data.lastName;
+    var ownerName = Config.get('OWNER_NAME') || 'Jeremy';
+    var ownerFirst = ownerName.split(' ')[0];
+    var eventTitle = data.firstName + '/' + ownerFirst + ': ' + data.meetingTypeName;
     var description = buildEventDescription(data);
     var calendar = CalendarApp.getCalendarById(Config.get('CALENDAR_ID'));
     var event = calendar.createEvent(eventTitle, startDate, endDate, {
@@ -172,6 +174,7 @@ function handleCreateBooking(data) {
       eventId: event.getId(),
       status: 'confirmed',
       meetingTypeId: data.meetingTypeId,
+      meetingTypeName: data.meetingTypeName,
       startTime: data.start,
       endTime: data.end,
       firstName: data.firstName,
@@ -297,7 +300,7 @@ function handleRescheduleBooking(data) {
   // Create new booking with reschedule
   var newBookingData = {
     meetingTypeId: oldBooking.meetingTypeId,
-    meetingTypeName: oldBooking.meetingTypeId, // Will be resolved from config
+    meetingTypeName: oldBooking.meetingTypeName || oldBooking.meetingTypeId,
     start: data.newStart,
     end: data.newEnd,
     firstName: oldBooking.firstName,
@@ -352,7 +355,9 @@ function handleRescheduleBooking(data) {
       purpose: oldBooking.purpose,
       notes: oldBooking.notes,
     };
-    var eventTitle = oldBooking.meetingTypeId + ' — ' + oldBooking.firstName + ' ' + oldBooking.lastName;
+    var ownerName = Config.get('OWNER_NAME') || 'Jeremy';
+    var ownerFirst = ownerName.split(' ')[0];
+    var eventTitle = oldBooking.firstName + '/' + ownerFirst + ': ' + oldBooking.meetingTypeName;
     var description = buildEventDescription(descData);
     var calendar = CalendarApp.getCalendarById(Config.get('CALENDAR_ID'));
     var newEvent = calendar.createEvent(eventTitle, newStart, newEnd, {
@@ -368,6 +373,7 @@ function handleRescheduleBooking(data) {
       eventId: newEvent.getId(),
       status: 'confirmed',
       meetingTypeId: oldBooking.meetingTypeId,
+      meetingTypeName: oldBooking.meetingTypeName || oldBooking.meetingTypeId,
       startTime: data.newStart,
       endTime: data.newEnd,
       firstName: oldBooking.firstName,
