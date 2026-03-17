@@ -30,7 +30,7 @@ var CalendarUI = (function () {
       slotMaxTime: DEFAULT_MAX_TIME,
       slotDuration: minutesToSlotDuration(durationMinutes),
       timeZone: 'local',
-      height: 'auto',
+      height: 600,
       nowIndicator: true,
       selectable: false,
       editable: false,
