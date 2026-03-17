@@ -63,29 +63,35 @@ apps_script_url: "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"
 
 ### config/meeting-types.yaml
 
-Defines the types of meetings visitors can book.
+Defines the types of meetings visitors can book. Duration is selected separately by the visitor (15, 30, 45, or 60 minutes) and is not part of the meeting type definition.
 
 ```yaml
 meeting_types:
   - id: office-hours
     name: "Office hours"
-    duration: 15
-    description: "Short meeting for quick questions."
+    description: "Meet with me about a course you're enrolled in this term."
+
+  - id: chat-check-in
+    name: "Chat or check-in"
+    description: "Chat or check in about your research or anything else."
+    instructions: "Please share a Google Doc with your agenda and supporting materials before our meeting."
 
   - id: project-meeting
     name: "Project meeting"
-    duration: 30
-    description: "Discuss a project update."
-    instructions: "Please share an agenda before our meeting."
+    description: "Discuss or provide an update on a lab project."
+    instructions: "Please share a Google Doc with your agenda and supporting materials before our meeting."
+
+  - id: other
+    name: "Other"
+    description: "For non-standard meetings. Please specify details in the booking form."
 ```
 
 | Field | Required | Description |
 |-|-|-|
 | `id` | Yes | Unique identifier (lowercase, hyphens) |
 | `name` | Yes | Display name shown to visitors |
-| `duration` | Yes | Meeting length in minutes (15, 30, 45, or 60) |
 | `description` | Yes | Description shown on the meeting type selection page |
-| `instructions` | No | Additional instructions shown to visitors when booking |
+| `instructions` | No | Instructions displayed prominently on the booking form (Step 4) when this type is selected. Used to request pre-meeting materials such as a Google Doc with agenda. |
 
 ### config/locations.yaml
 
@@ -128,12 +134,11 @@ To add a new meeting type, append an entry to `config/meeting-types.yaml`:
 ```yaml
   - id: my-custom-meeting
     name: "Custom Meeting"
-    duration: 45
-    description: "A 45-minute custom meeting type."
-    instructions: "Optional instructions for visitors."
+    description: "A custom meeting type for specific needs."
+    instructions: "Optional instructions shown on the booking form."
 ```
 
-The `id` must be unique across all meeting types. Supported durations are 15, 30, 45, and 60 minutes.
+The `id` must be unique across all meeting types. Duration is not specified per type — visitors choose their preferred duration (15, 30, 45, or 60 minutes) in a separate step. If you include an `instructions` field, its text will be displayed prominently on the booking form when a visitor selects this meeting type.
 
 ### changing the availability pattern
 

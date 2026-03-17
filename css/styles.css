@@ -225,6 +225,72 @@ a:hover {
   line-height: 1.6;
 }
 
+/* Duration Cards */
+.duration-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.duration-card {
+  border: 1px solid var(--accent-green);
+  padding: 24px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--white);
+  text-align: center;
+}
+
+.duration-card:hover {
+  border-color: var(--primary-green);
+  background: var(--bg-green-light);
+}
+
+.duration-card:focus {
+  outline: 2px solid var(--primary-green);
+  outline-offset: 2px;
+}
+
+.duration-card .duration-value {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 300;
+  color: var(--primary-green);
+  line-height: 1.2;
+}
+
+.duration-card .duration-label {
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--primary-green-light);
+  text-transform: lowercase;
+  letter-spacing: 0.4px;
+  margin-top: 4px;
+}
+
+/* Instruction Banner */
+.instruction-banner {
+  display: none;
+  background: var(--bg-green-light);
+  border-left: 3px solid var(--primary-green);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: var(--dark-text);
+  line-height: 1.6;
+}
+
+.instruction-banner.visible {
+  display: block;
+}
+
+.instruction-banner .instruction-icon {
+  font-weight: 600;
+  color: var(--primary-green);
+  margin-right: 6px;
+}
+
 /* Calendar */
 .calendar-container {
   margin-top: 20px;
@@ -628,6 +694,10 @@ a:hover {
 
   .step-content h2 {
     font-size: 22px;
+  }
+
+  .duration-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .form-row {

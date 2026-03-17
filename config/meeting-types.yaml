@@ -1,37 +1,18 @@
 meeting_types:
   - id: office-hours
     name: "Office hours"
-    duration: 15
     description: "Meet with me about a course you're enrolled in this term."
 
   - id: chat-check-in
     name: "Chat or check-in"
-    duration: 15
     description: "Chat or check in with me about some aspect of your research or anything else you'd like to talk with me about."
-    instructions: "Please include advance details via the booking form or email."
+    instructions: "Please share a Google Doc with your agenda and supporting materials before our meeting."
 
   - id: project-meeting
     name: "Project meeting"
-    duration: 30
     description: "Discuss or provide an update on a lab project."
     instructions: "Please share a Google Doc with your agenda and supporting materials before our meeting."
 
-  - id: other-15
-    name: "Other (15 minutes)"
-    duration: 15
+  - id: other
+    name: "Other"
     description: "For non-standard meetings. Please specify details in the booking form."
-
-  - id: other-30
-    name: "Other (30 minutes)"
-    duration: 30
-    description: "Extended meeting option. Please specify details in the booking form."
-
-  - id: other-45
-    name: "Other (45 minutes)"
-    duration: 45
-    description: "Extended meeting option. Please specify details in the booking form."
-
-  - id: other-60
-    name: "Other (1 hr)"
-    duration: 60
-    description: "Extended meeting option. Please specify details in the booking form."

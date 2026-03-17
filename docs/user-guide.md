@@ -6,7 +6,14 @@ This guide walks through the process of booking, rescheduling, and cancelling ap
 
 ### step 1: select a meeting type
 
-When you visit the scheduler, you will see a list of available meeting types. Each type shows a name, duration, and description.
+When you visit the scheduler, you will see a list of available meeting types. Each type shows a name and description.
+
+The available meeting types are:
+
+- **Office hours** — for students enrolled in a course this term
+- **Chat or check-in** — for research discussions or general conversation
+- **Project meeting** — for lab project updates and discussions
+- **Other** — for non-standard meetings
 
 Click on a meeting type to proceed.
 
@@ -17,9 +24,20 @@ Click on a meeting type to proceed.
 :class: screenshot
 ```
 
-### step 2: choose a date and time
+### step 2: choose a duration
 
-After selecting a meeting type, a calendar view appears showing available time slots. Available slots are highlighted in green.
+After selecting a meeting type, you will see four duration options:
+
+- **15 min**
+- **30 min**
+- **45 min**
+- **1 hr**
+
+All durations are available for every meeting type. Click on a duration to proceed.
+
+### step 3: choose a date and time
+
+After selecting a duration, a calendar view appears showing available time slots. Available slots are highlighted in green and sized to match your chosen duration.
 
 - Use the **arrow buttons** to navigate between weeks
 - Click on an **available slot** to select it
@@ -32,7 +50,7 @@ After selecting a meeting type, a calendar view appears showing available time s
 :class: screenshot
 ```
 
-### step 3: fill out the booking form
+### step 4: fill out the booking form
 
 After clicking a slot, the booking form appears. Fill in:
 
@@ -41,6 +59,10 @@ After clicking a slot, the booking form appears. Fill in:
 - **Format** — choose between virtual (e.g., Zoom) or in-person
 - **Purpose** — briefly describe why you are booking
 - **Notes** — (optional) any additional details
+
+```{note}
+If you selected **Chat or check-in** or **Project meeting**, an instruction banner will appear at the top of this step asking you to share a Google Doc with your agenda and supporting materials before the meeting.
+```
 
 <!-- screenshot placeholder: booking form -->
 ```{image} _static/screenshots/03-booking-form.png
@@ -51,12 +73,12 @@ After clicking a slot, the booking form appears. Fill in:
 
 Click **Submit** to complete your booking.
 
-### step 4: confirmation
+### step 5: confirmation
 
 After submitting, you will see a confirmation page with:
 
-- The meeting date, time, and duration
-- The meeting location (virtual link or physical address)
+- The meeting type and duration
+- The meeting date, time, and location (virtual link or physical address)
 - Links to **reschedule** or **cancel** your booking
 
 ```{image} _static/screenshots/04-confirmation.png
@@ -78,7 +100,7 @@ If you need to change the time of your booking:
 3. Click on a new available slot
 4. Confirm the reschedule
 
-<!-- Reschedule page looks similar to the calendar view in step 2 -->
+<!-- Reschedule page looks similar to the calendar view in step 3 -->
 
 After rescheduling:
 - The original calendar event is removed
@@ -111,7 +133,7 @@ CDL Scheduler sends automatic email notifications at each stage:
 
 ### confirmation email
 - Sent to both the visitor and the calendar owner
-- Contains the meeting date, time, duration, location, and purpose
+- Contains the meeting type, duration, date, time, location, and purpose
 - Includes an **iCal attachment** (.ics file) that can be added to your calendar app
 - Contains links to reschedule or cancel the booking
 

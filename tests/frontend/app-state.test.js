@@ -1,10 +1,8 @@
 /**
- * T026b — Unit tests for UI state management
+ * Unit tests for UI state management — 5-step booking flow.
  * Tests step navigation, loading spinner, error messages, back navigation.
- * Written TDD-style: defines expected API before app.js implementation.
  */
 
-// App module will be implemented in T031/T035
 let App;
 try {
   App = require('../../js/app');
@@ -14,7 +12,7 @@ try {
 
 const describeIfExists = App ? describe : describe.skip;
 
-// Build DOM structure matching index.html using safe DOM methods
+// Build DOM structure matching 5-step index.html
 function setupDOM() {
   document.body.textContent = '';
 
@@ -22,7 +20,7 @@ function setupDOM() {
   indicator.className = 'step-indicator';
   indicator.id = 'step-indicator';
 
-  const stepLabels = ['1. Meeting Type', '2. Date & Time', '3. Your Details', '4. Confirmation'];
+  const stepLabels = ['1. Meeting Type', '2. Duration', '3. Date & Time', '4. Your Details', '5. Confirmation'];
   stepLabels.forEach((label, i) => {
     const span = document.createElement('span');
     span.className = i === 0 ? 'step active' : 'step';
@@ -32,7 +30,7 @@ function setupDOM() {
   });
   document.body.appendChild(indicator);
 
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 5; i++) {
     const section = document.createElement('section');
     section.id = 'step-' + i;
     section.className = i === 1 ? 'step-content active' : 'step-content';
@@ -50,7 +48,7 @@ function setupDOM() {
   document.body.appendChild(errorBanner);
 }
 
-describeIfExists('Step navigation', () => {
+describeIfExists('Step navigation (5-step flow)', () => {
   beforeEach(setupDOM);
 
   test('goToStep shows correct step content and updates indicator', () => {
@@ -71,6 +69,44 @@ describeIfExists('Step navigation', () => {
     App.goToStep(2);
     const activeSteps = document.querySelectorAll('.step-content.active');
     expect(activeSteps).toHaveLength(1);
+  });
+
+  test('goToStep works for all 5 steps', () => {
+    for (let step = 1; step <= 5; step++) {
+      App.goToStep(step);
+      expect(document.getElementById('step-' + step).classList.contains('active')).toBe(true);
+      const activeSteps = document.querySelectorAll('.step-content.active');
+      expect(activeSteps).toHaveLength(1);
+    }
+  });
+
+  test('step 4 shows steps 1-3 as completed', () => {
+    App.goToStep(4);
+    const steps = document.querySelectorAll('.step-indicator .step');
+    expect(steps[0].classList.contains('completed')).toBe(true);
+    expect(steps[1].classList.contains('completed')).toBe(true);
+    expect(steps[2].classList.contains('completed')).toBe(true);
+    expect(steps[3].classList.contains('active')).toBe(true);
+    expect(steps[4].classList.contains('active')).toBe(false);
+  });
+
+  test('step 5 shows steps 1-4 as completed', () => {
+    App.goToStep(5);
+    const steps = document.querySelectorAll('.step-indicator .step');
+    expect(steps[0].classList.contains('completed')).toBe(true);
+    expect(steps[1].classList.contains('completed')).toBe(true);
+    expect(steps[2].classList.contains('completed')).toBe(true);
+    expect(steps[3].classList.contains('completed')).toBe(true);
+    expect(steps[4].classList.contains('active')).toBe(true);
+  });
+
+  test('going back to step 1 clears completed states', () => {
+    App.goToStep(3);
+    App.goToStep(1);
+    const steps = document.querySelectorAll('.step-indicator .step');
+    expect(steps[0].classList.contains('active')).toBe(true);
+    expect(steps[1].classList.contains('completed')).toBe(false);
+    expect(steps[2].classList.contains('completed')).toBe(false);
   });
 });
 

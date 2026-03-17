@@ -21,9 +21,10 @@
     <div class="steps">
       <div class="step-indicator" id="step-indicator">
         <span class="step active" data-step="1">1. Meeting Type</span>
-        <span class="step" data-step="2">2. Date &amp; Time</span>
-        <span class="step" data-step="3">3. Your Details</span>
-        <span class="step" data-step="4">4. Confirmation</span>
+        <span class="step" data-step="2">2. Duration</span>
+        <span class="step" data-step="3">3. Date &amp; Time</span>
+        <span class="step" data-step="4">4. Your Details</span>
+        <span class="step" data-step="5">5. Confirmation</span>
       </div>
     </div>
 
@@ -33,19 +34,28 @@
       <div id="meeting-types" class="meeting-types-grid"></div>
     </section>
 
-    <!-- Step 2: Calendar / Slot Selection -->
-    <section id="step-2" class="step-content" aria-label="Select date and time">
-      <h2>Choose a Time</h2>
+    <!-- Step 2: Duration Selection -->
+    <section id="step-2" class="step-content" aria-label="Select meeting duration">
+      <h2>Choose a Duration</h2>
       <p id="selected-type-info" class="selected-info"></p>
       <button class="btn btn-back" id="back-to-step-1" aria-label="Go back to meeting type selection">&larr; Back</button>
+      <div id="duration-options" class="duration-grid"></div>
+    </section>
+
+    <!-- Step 3: Calendar / Slot Selection -->
+    <section id="step-3" class="step-content" aria-label="Select date and time">
+      <h2>Choose a Time</h2>
+      <p id="selected-duration-info" class="selected-info"></p>
+      <button class="btn btn-back" id="back-to-step-2" aria-label="Go back to duration selection">&larr; Back</button>
       <div id="calendar-container" class="calendar-container"></div>
     </section>
 
-    <!-- Step 3: Booking Form -->
-    <section id="step-3" class="step-content" aria-label="Enter your details">
+    <!-- Step 4: Booking Form -->
+    <section id="step-4" class="step-content" aria-label="Enter your details">
       <h2>Your Details</h2>
       <p id="selected-slot-info" class="selected-info"></p>
-      <button class="btn btn-back" id="back-to-step-2" aria-label="Go back to time selection">&larr; Back</button>
+      <div id="instruction-banner" class="instruction-banner"></div>
+      <button class="btn btn-back" id="back-to-step-3" aria-label="Go back to time selection">&larr; Back</button>
       <form id="booking-form" novalidate>
         <div class="form-row">
           <div class="form-group">
@@ -83,8 +93,8 @@
       </form>
     </section>
 
-    <!-- Step 4: Confirmation -->
-    <section id="step-4" class="step-content" aria-label="Booking confirmation">
+    <!-- Step 5: Confirmation -->
+    <section id="step-5" class="step-content" aria-label="Booking confirmation">
       <div id="confirmation-content"></div>
     </section>
 
