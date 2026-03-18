@@ -296,6 +296,15 @@ a:hover {
   margin-top: 20px;
 }
 
+/* Equal row heights: slot cells use minimal height so the browser
+   distributes table height evenly. The actual table height is set
+   via JS (equalizeSlotRows) to match the scroller container. */
+.fc .fc-timegrid-slot {
+  height: 1px !important;
+}
+
+
+
 /* FullCalendar Theme Overrides */
 .fc {
   font-family: var(--font-body) !important;

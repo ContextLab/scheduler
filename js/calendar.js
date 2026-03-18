@@ -8,29 +8,41 @@ var CalendarUI = (function () {
   var _calendar = null;
   var _durationMinutes = 15;
   var _onSlotSelected = null;
+  var _containerEl = null;
+  var _currentMinTime = '09:00:00';
+  var _currentMaxTime = '17:00:00';
+  var _prefetchedEvents = null;
   var DEFAULT_MIN_TIME = '09:00:00';
   var DEFAULT_MAX_TIME = '17:00:00';
 
   function init(durationMinutes, onSlotSelected) {
     _durationMinutes = durationMinutes;
     _onSlotSelected = onSlotSelected;
+    _currentMinTime = DEFAULT_MIN_TIME;
+    _currentMaxTime = DEFAULT_MAX_TIME;
+    _prefetchedEvents = null;
 
-    var containerEl = document.getElementById('calendar-container');
-    containerEl.textContent = '';
+    _containerEl = document.getElementById('calendar-container');
+    _containerEl.textContent = '';
 
-    _calendar = new FullCalendar.Calendar(containerEl, {
-      initialView: 'timeGridWeek',
+    buildCalendar(_currentMinTime, _currentMaxTime);
+  }
+
+  function makeCalendarOptions(minTime, maxTime, initialView, initialDate) {
+    var opts = {
+      initialView: initialView || 'timeGridWeek',
       headerToolbar: {
         left: 'prev,next today',
         center: 'title',
         right: 'timeGridWeek,timeGridDay',
       },
       allDaySlot: false,
-      slotMinTime: DEFAULT_MIN_TIME,
-      slotMaxTime: DEFAULT_MAX_TIME,
-      slotDuration: minutesToSlotDuration(durationMinutes),
+      slotMinTime: minTime,
+      slotMaxTime: maxTime,
+      slotDuration: minutesToSlotDuration(_durationMinutes),
       timeZone: 'local',
-      height: 600,
+      contentHeight: 500,
+      expandRows: true,
       nowIndicator: true,
       selectable: false,
       editable: false,
@@ -51,6 +63,7 @@ var CalendarUI = (function () {
           App.showLoading();
         } else {
           App.hideLoading();
+          equalizeSlotRows();
         }
       },
       validRange: function () {
@@ -62,12 +75,39 @@ var CalendarUI = (function () {
           end: new Date(Date.now() + maxDays * 24 * 60 * 60 * 1000),
         };
       },
-    });
+    };
+    if (initialDate) {
+      opts.initialDate = initialDate;
+    }
+    return opts;
+  }
 
+  function buildCalendar(minTime, maxTime, initialView, initialDate) {
+    if (_calendar) {
+      _calendar.destroy();
+      _calendar = null;
+    }
+    _currentMinTime = minTime;
+    _currentMaxTime = maxTime;
+    _calendar = new FullCalendar.Calendar(
+      _containerEl,
+      makeCalendarOptions(minTime, maxTime, initialView, initialDate)
+    );
     _calendar.render();
+    // Defer equalization to after FullCalendar finishes DOM layout
+    setTimeout(equalizeSlotRows, 100);
   }
 
   function fetchSlots(info, successCallback, failureCallback) {
+    // If we have prefetched events from a rebuild, use them once
+    if (_prefetchedEvents !== null) {
+      var cached = _prefetchedEvents;
+      _prefetchedEvents = null;
+      displayEvents(cached);
+      successCallback(cached);
+      return;
+    }
+
     ApiClient.getAvailableSlots(
       info.startStr,
       info.endStr,
@@ -90,18 +130,31 @@ var CalendarUI = (function () {
           };
         });
 
+        // Determine correct time range
+        var newMin, newMax;
         if (events.length === 0) {
-          showNoSlotsMessage();
-          // Reset to default 9-5 range when no slots
-          if (_calendar) {
-            _calendar.setOption('slotMinTime', DEFAULT_MIN_TIME);
-            _calendar.setOption('slotMaxTime', DEFAULT_MAX_TIME);
-          }
+          newMin = DEFAULT_MIN_TIME;
+          newMax = DEFAULT_MAX_TIME;
         } else {
-          hideNoSlotsMessage();
-          adjustTimeRange(events);
+          var range = getTimeRange(events);
+          newMin = range.minTime;
+          newMax = range.maxTime;
         }
 
+        // If range changed, rebuild the calendar with the correct range
+        // Use setTimeout to avoid destroying calendar inside its own callback
+        if (newMin !== _currentMinTime || newMax !== _currentMaxTime) {
+          var currentDate = _calendar ? _calendar.getDate() : null;
+          var currentView = _calendar ? _calendar.view.type : 'timeGridWeek';
+          _prefetchedEvents = events;
+          successCallback([]); // satisfy FullCalendar's callback requirement
+          setTimeout(function () {
+            buildCalendar(newMin, newMax, currentView, currentDate);
+          }, 0);
+          return;
+        }
+
+        displayEvents(events);
         successCallback(events);
       })
       .catch(function (err) {
@@ -110,13 +163,18 @@ var CalendarUI = (function () {
       });
   }
 
-  /**
-   * Adjust the visible time range to span from the earliest slot start
-   * to the latest slot end in the current view, with no extra padding.
-   */
-  function adjustTimeRange(events) {
-    if (!_calendar || events.length === 0) return;
+  function displayEvents(events) {
+    if (events.length === 0) {
+      showNoSlotsMessage();
+    } else {
+      hideNoSlotsMessage();
+    }
+  }
 
+  /**
+   * Calculate the visible time range from slot boundaries.
+   */
+  function getTimeRange(events) {
     var minHour = 23;
     var minMinute = 59;
     var maxHour = 0;
@@ -126,26 +184,39 @@ var CalendarUI = (function () {
       var start = new Date(evt.start);
       var end = new Date(evt.end);
 
-      var startH = start.getHours();
-      var startM = start.getMinutes();
-      var endH = end.getHours();
-      var endM = end.getMinutes();
+      var sH = start.getHours();
+      var sM = start.getMinutes();
+      var eH = end.getHours();
+      var eM = end.getMinutes();
 
-      if (startH < minHour || (startH === minHour && startM < minMinute)) {
-        minHour = startH;
-        minMinute = startM;
+      if (sH < minHour || (sH === minHour && sM < minMinute)) {
+        minHour = sH;
+        minMinute = sM;
       }
-      if (endH > maxHour || (endH === maxHour && endM > maxMinute)) {
-        maxHour = endH;
-        maxMinute = endM;
+      if (eH > maxHour || (eH === maxHour && eM > maxMinute)) {
+        maxHour = eH;
+        maxMinute = eM;
       }
     });
 
-    var minTime = padTime(minHour) + ':' + padTime(minMinute) + ':00';
-    var maxTime = padTime(maxHour) + ':' + padTime(maxMinute) + ':00';
+    return {
+      minTime: padTime(minHour) + ':' + padTime(minMinute) + ':00',
+      maxTime: padTime(maxHour) + ':' + padTime(maxMinute) + ':00',
+    };
+  }
 
-    _calendar.setOption('slotMinTime', minTime);
-    _calendar.setOption('slotMaxTime', maxTime);
+  /**
+   * Force the slots table height to match the scroller container,
+   * so that all slot rows distribute the space equally.
+   * CSS height:100% doesn't work because the parent chain lacks explicit heights.
+   */
+  function equalizeSlotRows() {
+    if (!_containerEl) return;
+    var scroller = _containerEl.querySelector('.fc-scroller-liquid-absolute');
+    var slotsTable = _containerEl.querySelector('.fc-timegrid-slots table');
+    if (scroller && slotsTable) {
+      slotsTable.style.height = scroller.offsetHeight + 'px';
+    }
   }
 
   function padTime(n) {
@@ -153,19 +224,17 @@ var CalendarUI = (function () {
   }
 
   function showNoSlotsMessage() {
-    var container = document.getElementById('calendar-container');
-    var existing = container.querySelector('.no-slots-message');
+    var existing = _containerEl.querySelector('.no-slots-message');
     if (!existing) {
       var msg = document.createElement('div');
       msg.className = 'no-slots-message';
       msg.textContent = 'No available times this week. Try navigating to another week.';
-      container.appendChild(msg);
+      _containerEl.appendChild(msg);
     }
   }
 
   function hideNoSlotsMessage() {
-    var container = document.getElementById('calendar-container');
-    var existing = container.querySelector('.no-slots-message');
+    var existing = _containerEl.querySelector('.no-slots-message');
     if (existing) {
       existing.remove();
     }
