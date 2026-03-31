@@ -5,9 +5,36 @@
 
 const ApiClient = (function () {
   let _baseUrl = null;
+  var _slotCache = {}; // key: "startISO|endISO|duration" → Promise<result>
 
   function init(appsScriptUrl) {
     _baseUrl = appsScriptUrl;
+  }
+
+  /**
+   * Prefetch slots for a date range at 15-min granularity.
+   * Called early (page load) so data is ready when user reaches Step 3.
+   */
+  function prefetchSlots(startDate, endDate) {
+    var key = startDate + '|' + endDate + '|15';
+    if (_slotCache[key]) return; // already prefetching
+    _slotCache[key] = apiCall('getAvailableSlots', {
+      startDate: startDate,
+      endDate: endDate,
+      durationMinutes: 15,
+    }).catch(function () { delete _slotCache[key]; });
+  }
+
+  /**
+   * Get the cache key for a slot request. Returns cached promise if available.
+   */
+  function getCachedSlots(startDate, endDate, durationMinutes) {
+    var key = startDate + '|' + endDate + '|' + durationMinutes;
+    return _slotCache[key] || null;
+  }
+
+  function cacheSlots(startDate, endDate, durationMinutes, promise) {
+    _slotCache[startDate + '|' + endDate + '|' + durationMinutes] = promise;
   }
 
   async function apiCall(action, data) {
@@ -50,11 +77,17 @@ const ApiClient = (function () {
   }
 
   async function getAvailableSlots(startDate, endDate, durationMinutes) {
-    return apiCall('getAvailableSlots', {
+    // Check cache first
+    var cached = getCachedSlots(startDate, endDate, durationMinutes);
+    if (cached) return cached;
+
+    var promise = apiCall('getAvailableSlots', {
       startDate: startDate,
       endDate: endDate,
       durationMinutes: durationMinutes,
     });
+    cacheSlots(startDate, endDate, durationMinutes, promise);
+    return promise;
   }
 
   async function createBooking(bookingData) {
@@ -93,6 +126,7 @@ const ApiClient = (function () {
     init: init,
     apiCall: apiCall,
     getAvailableSlots: getAvailableSlots,
+    prefetchSlots: prefetchSlots,
     createBooking: createBooking,
     cancelBooking: cancelBooking,
     getBooking: getBooking,

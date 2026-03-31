@@ -29,6 +29,17 @@ var App = (function () {
         // Initialize API client
         ApiClient.init(config.settings.apps_script_url);
 
+        // Prefetch slots for current week so data is ready when user reaches Step 3.
+        // Uses 15-min granularity; backend returns the same availability windows
+        // regardless of duration, just sliced differently.
+        var now = new Date();
+        var weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - now.getDay());
+        weekStart.setHours(0, 0, 0, 0);
+        var weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 7);
+        ApiClient.prefetchSlots(weekStart.toISOString(), weekEnd.toISOString());
+
         // Render meeting types
         renderMeetingTypes(config.meetingTypes);
 
