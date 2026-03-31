@@ -121,7 +121,13 @@ var App = (function () {
     var container = document.getElementById('duration-options');
     container.textContent = '';
 
-    DURATION_OPTIONS.forEach(function (opt) {
+    // Filter durations by type's allowed_durations (if specified)
+    var allowed = _selectedType && _selectedType.allowed_durations;
+    var options = DURATION_OPTIONS.filter(function (opt) {
+      return !allowed || allowed.indexOf(opt.minutes) !== -1;
+    });
+
+    options.forEach(function (opt) {
       var card = document.createElement('div');
       card.className = 'duration-card';
       card.tabIndex = 0;

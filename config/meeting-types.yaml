@@ -13,6 +13,16 @@ meeting_types:
     description: "Discuss or provide an update on a lab project."
     instructions: "Please share a Google Doc with your agenda and supporting materials before our meeting."
 
+  - id: walk
+    name: "Walk"
+    description: "Go for a walk and talk."
+    allowed_durations: [30, 45, 60]
+
+  - id: grab-coffee
+    name: "Grab coffee"
+    description: "Grab a coffee and chat."
+    allowed_durations: [30, 45, 60]
+
   - id: other
     name: "Other"
     description: "For non-standard meetings. Please specify details in the booking form."

@@ -64,7 +64,11 @@ var CalendarService = (function () {
   }
 
   /**
-   * Find events on the designated calendar whose title matches the availability pattern.
+   * Find events on the designated calendar that represent available booking windows.
+   * Two detection paths:
+   *   1. Title matches the AVAILABILITY_PATTERN (e.g. "Jeremy office hours")
+   *   2. Title matches a FREE_EVENT_PATTERNS entry AND the event is marked "free"
+   *      (transparency = "transparent" in Google Calendar)
    */
   function findAvailabilityWindows(calendarId, pattern, startDate, endDate) {
     var calendar = CalendarApp.getCalendarById(calendarId);
@@ -76,18 +80,72 @@ var CalendarService = (function () {
     var events = calendar.getEvents(startDate, endDate);
     var windows = [];
     var patternLower = pattern.toLowerCase();
+    var freePatterns = getFreeEventPatterns();
 
     for (var i = 0; i < events.length; i++) {
       var title = events[i].getTitle().toLowerCase();
+
+      // Path 1: title matches the main availability pattern
       if (title.indexOf(patternLower) !== -1) {
         windows.push({
           start: events[i].getStartTime().getTime(),
           end: events[i].getEndTime().getTime(),
         });
+        continue;
+      }
+
+      // Path 2: title matches a free-event pattern AND event is marked "free"
+      if (freePatterns.length > 0 && matchesFreePattern(title, freePatterns)) {
+        if (isEventFree(calendarId, events[i])) {
+          windows.push({
+            start: events[i].getStartTime().getTime(),
+            end: events[i].getEndTime().getTime(),
+          });
+        }
       }
     }
 
     return windows;
+  }
+
+  /**
+   * Parse FREE_EVENT_PATTERNS Script Property into an array of lowercase patterns.
+   */
+  function getFreeEventPatterns() {
+    var raw = Config.get('FREE_EVENT_PATTERNS');
+    if (!raw) return [];
+    try {
+      var patterns = JSON.parse(raw);
+      if (!Array.isArray(patterns)) return [];
+      return patterns.map(function (p) { return p.toLowerCase(); });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * Check if an event title matches any of the free-event patterns.
+   */
+  function matchesFreePattern(titleLower, freePatterns) {
+    for (var i = 0; i < freePatterns.length; i++) {
+      if (titleLower.indexOf(freePatterns[i]) !== -1) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Check if an event is marked as "free" (transparent) using the Calendar Advanced Service.
+   * CalendarApp doesn't expose transparency, so we use Calendar.Events.get().
+   */
+  function isEventFree(calendarId, event) {
+    try {
+      var eventId = event.getId().replace('@google.com', '');
+      var resource = Calendar.Events.get(calendarId, eventId);
+      return resource.transparency === 'transparent';
+    } catch (e) {
+      Logger.log('Could not check transparency for event: ' + e.message);
+      return false;
+    }
   }
 
   /**
@@ -152,11 +210,14 @@ var CalendarService = (function () {
     var events = calendar.getEvents(startDate, endDate);
     var busyTimes = [];
     var patternLower = pattern.toLowerCase();
+    var freePatterns = getFreeEventPatterns();
 
     for (var i = 0; i < events.length; i++) {
       var title = events[i].getTitle().toLowerCase();
       // Skip availability window events — they define free time, not busy time
       if (title.indexOf(patternLower) !== -1) continue;
+      // Skip free-pattern events that are marked as "free" — they also define available time
+      if (freePatterns.length > 0 && matchesFreePattern(title, freePatterns) && isEventFree(calendarId, events[i])) continue;
       // Skip events the user has declined
       var myStatus = events[i].getMyStatus();
       if (myStatus === CalendarApp.GuestStatus.NO) continue;
@@ -320,10 +381,13 @@ var CalendarService = (function () {
     var freeWindows = subtractBusyTimes(windows, busyTimes);
     var slots = generateSlots(freeWindows, 15);
 
+    var freePatterns = getFreeEventPatterns();
+
     return {
       calendarId: calendarId,
       calendarName: calName,
       pattern: pattern,
+      freeEventPatterns: freePatterns,
       dateRange: { start: startDate.toISOString(), end: endDate.toISOString() },
       totalEventsInRange: eventList.length,
       events: eventList,

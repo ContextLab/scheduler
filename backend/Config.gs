@@ -14,6 +14,7 @@ var Config = (function () {
     MAX_ADVANCE_DAYS: '90',
     TOKEN_EXPIRY_DAYS: '90',
     CONFLICT_CALENDAR_IDS: '',  // JSON array of calendar IDs to check for conflicts
+    FREE_EVENT_PATTERNS: '',   // JSON array of event title patterns to treat as availability when marked "free"
   };
 
   function get(key) {
