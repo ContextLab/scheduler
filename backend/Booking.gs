@@ -6,7 +6,7 @@
 var BookingStore = (function () {
   var HEADERS = [
     'token', 'tokenExpiresAt', 'eventId', 'status', 'meetingTypeId',
-    'meetingTypeName', 'startTime', 'endTime', 'firstName', 'lastName',
+    'meetingTypeName', 'eventLabel', 'startTime', 'endTime', 'firstName', 'lastName',
     'email', 'format', 'location', 'purpose', 'notes', 'createdAt',
     'cancelledAt', 'rescheduledTo',
   ];

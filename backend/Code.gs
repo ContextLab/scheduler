@@ -159,7 +159,9 @@ function handleCreateBooking(data) {
     // Create calendar event
     var ownerName = Config.get('OWNER_NAME') || 'Jeremy';
     var ownerFirst = ownerName.split(' ')[0];
-    var eventTitle = data.firstName + '/' + ownerFirst + ': ' + data.meetingTypeName;
+    var eventTitle = data.eventLabel
+      ? data.firstName + '/' + ownerFirst + ' ' + data.eventLabel
+      : data.firstName + '/' + ownerFirst + ': ' + data.meetingTypeName;
     var description = buildEventDescription(data);
     var calendar = CalendarApp.getCalendarById(Config.get('CALENDAR_ID'));
     var event = calendar.createEvent(eventTitle, startDate, endDate, {
@@ -175,6 +177,7 @@ function handleCreateBooking(data) {
       status: 'confirmed',
       meetingTypeId: data.meetingTypeId,
       meetingTypeName: data.meetingTypeName,
+      eventLabel: data.eventLabel || '',
       startTime: data.start,
       endTime: data.end,
       firstName: data.firstName,
@@ -357,7 +360,9 @@ function handleRescheduleBooking(data) {
     };
     var ownerName = Config.get('OWNER_NAME') || 'Jeremy';
     var ownerFirst = ownerName.split(' ')[0];
-    var eventTitle = oldBooking.firstName + '/' + ownerFirst + ': ' + oldBooking.meetingTypeName;
+    var eventTitle = oldBooking.eventLabel
+      ? oldBooking.firstName + '/' + ownerFirst + ' ' + oldBooking.eventLabel
+      : oldBooking.firstName + '/' + ownerFirst + ': ' + (oldBooking.meetingTypeName || oldBooking.meetingTypeId);
     var description = buildEventDescription(descData);
     var calendar = CalendarApp.getCalendarById(Config.get('CALENDAR_ID'));
     var newEvent = calendar.createEvent(eventTitle, newStart, newEnd, {
@@ -374,6 +379,7 @@ function handleRescheduleBooking(data) {
       status: 'confirmed',
       meetingTypeId: oldBooking.meetingTypeId,
       meetingTypeName: oldBooking.meetingTypeName || oldBooking.meetingTypeId,
+      eventLabel: oldBooking.eventLabel || '',
       startTime: data.newStart,
       endTime: data.newEnd,
       firstName: oldBooking.firstName,

@@ -150,11 +150,39 @@ var BookingForm = (function () {
     return map[name] || name;
   }
 
+  /**
+   * Re-populate the format dropdown, optionally filtering to only allowed location IDs.
+   * If allowedIds is null/undefined, shows all locations.
+   */
+  function updateLocations(allowedIds) {
+    var filtered = _locations;
+    if (allowedIds && allowedIds.length > 0) {
+      filtered = _locations.filter(function (loc) {
+        return allowedIds.indexOf(loc.id) !== -1;
+      });
+    }
+    var select = document.getElementById('format');
+    while (select.options.length > 1) {
+      select.remove(1);
+    }
+    filtered.forEach(function (loc) {
+      var option = document.createElement('option');
+      option.value = loc.id;
+      option.textContent = loc.label;
+      select.appendChild(option);
+    });
+    // Auto-select if only one option
+    if (filtered.length === 1) {
+      select.value = filtered[0].id;
+    }
+  }
+
   return {
     init: init,
     validateField: validateField,
     validateAll: validateAll,
     extractFormData: extractFormData,
+    updateLocations: updateLocations,
   };
 })();
 

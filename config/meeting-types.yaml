@@ -17,11 +17,17 @@ meeting_types:
     name: "Walk"
     description: "Go for a walk and talk."
     allowed_durations: [30, 45, 60]
+    allowed_locations: ["in-person"]
+    location_override: "Meet at Jeremy's office — Moore 349"
+    event_label: "walk"
 
   - id: grab-coffee
     name: "Grab coffee"
     description: "Grab a coffee and chat."
     allowed_durations: [30, 45, 60]
+    allowed_locations: ["in-person"]
+    location_override: "Meet at Jeremy's office — Moore 349"
+    event_label: "coffee"
 
   - id: other
     name: "Other"

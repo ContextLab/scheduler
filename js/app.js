@@ -175,6 +175,9 @@ var App = (function () {
       TimezoneUtil.formatDateTime(slot.start) + ' (' +
       TimezoneUtil.getTimezoneAbbreviation() + ')';
 
+    // Filter location dropdown based on type's allowed_locations
+    BookingForm.updateLocations(_selectedType.allowed_locations || null);
+
     // Show or hide instruction banner
     var banner = document.getElementById('instruction-banner');
     if (_selectedType.instructions) {
@@ -265,9 +268,16 @@ var App = (function () {
       return loc.id === formData.format;
     });
 
+    // Apply location_override if the meeting type specifies one
+    var locationValue = location ? location.value : formData.format;
+    if (_selectedType.location_override) {
+      locationValue = _selectedType.location_override;
+    }
+
     var bookingData = {
       meetingTypeId: _selectedType.id,
       meetingTypeName: _selectedType.name,
+      eventLabel: _selectedType.event_label || '',
       duration: _selectedDuration,
       start: _selectedSlot.start,
       end: _selectedSlot.end,
@@ -275,7 +285,7 @@ var App = (function () {
       lastName: formData.lastName,
       email: formData.email,
       format: formData.format,
-      location: location ? location.value : formData.format,
+      location: locationValue,
       purpose: formData.purpose || '',
       notes: formData.notes || '',
     };
