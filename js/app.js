@@ -29,16 +29,13 @@ var App = (function () {
         // Initialize API client
         ApiClient.init(config.settings.apps_script_url);
 
-        // Prefetch slots for current week so data is ready when user reaches Step 3.
-        // Uses 15-min granularity; backend returns the same availability windows
-        // regardless of duration, just sliced differently.
-        var now = new Date();
-        var weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - now.getDay());
-        weekStart.setHours(0, 0, 0, 0);
-        var weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 7);
-        ApiClient.prefetchSlots(weekStart.toISOString(), weekEnd.toISOString());
+        // Prefetch slots for the full booking window so data is ready when user
+        // reaches Step 3. One API call covers all navigable weeks.
+        var minHours = config.settings.min_notice_hours || 12;
+        var maxDays = config.settings.max_advance_days || 90;
+        var prefetchStart = new Date(Date.now() + minHours * 60 * 60 * 1000);
+        var prefetchEnd = new Date(Date.now() + maxDays * 24 * 60 * 60 * 1000);
+        ApiClient.prefetchSlots(prefetchStart.toISOString(), prefetchEnd.toISOString());
 
         // Render meeting types
         renderMeetingTypes(config.meetingTypes);

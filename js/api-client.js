@@ -5,36 +5,96 @@
 
 const ApiClient = (function () {
   let _baseUrl = null;
-  var _slotCache = {}; // key: "startISO|endISO|duration" → Promise<result>
+  var _prefetchPromise = null; // Promise<{slots: [{start,end}]}> for full date range
+  var _prefetchRange = null;   // {start: ISO, end: ISO}
 
   function init(appsScriptUrl) {
     _baseUrl = appsScriptUrl;
   }
 
   /**
-   * Prefetch slots for a date range at 15-min granularity.
-   * Called early (page load) so data is ready when user reaches Step 3.
+   * Prefetch slots for the full booking window at 15-min granularity.
+   * Called on page load so data is ready when user reaches Step 3.
    */
   function prefetchSlots(startDate, endDate) {
-    var key = startDate + '|' + endDate + '|15';
-    if (_slotCache[key]) return; // already prefetching
-    _slotCache[key] = apiCall('getAvailableSlots', {
+    if (_prefetchPromise) return;
+    _prefetchRange = { start: startDate, end: endDate };
+    _prefetchPromise = apiCall('getAvailableSlots', {
       startDate: startDate,
       endDate: endDate,
       durationMinutes: 15,
-    }).catch(function () { delete _slotCache[key]; });
+    }).catch(function () {
+      _prefetchPromise = null;
+      _prefetchRange = null;
+    });
   }
 
   /**
-   * Get the cache key for a slot request. Returns cached promise if available.
+   * Try to serve a slot request from the prefetched data.
+   * The prefetch uses 15-min slots; for larger durations we filter
+   * to only include slots whose time boundaries align with the requested duration.
    */
-  function getCachedSlots(startDate, endDate, durationMinutes) {
-    var key = startDate + '|' + endDate + '|' + durationMinutes;
-    return _slotCache[key] || null;
+  function tryServePrefetch(startDate, endDate, durationMinutes) {
+    if (!_prefetchPromise || !_prefetchRange) return null;
+    // Check if requested range is within prefetched range
+    if (new Date(startDate) < new Date(_prefetchRange.start) ||
+        new Date(endDate) > new Date(_prefetchRange.end)) {
+      return null;
+    }
+    var reqStart = new Date(startDate).getTime();
+    var reqEnd = new Date(endDate).getTime();
+    var durationMs = durationMinutes * 60 * 1000;
+
+    return _prefetchPromise.then(function (result) {
+      if (!result || !result.slots) return result;
+      // Filter slots to the requested date range and duration
+      var filtered = result.slots.filter(function (slot) {
+        var s = new Date(slot.start).getTime();
+        var e = new Date(slot.end).getTime();
+        return s >= reqStart && e <= reqEnd;
+      });
+      // For durations > 15 min, merge consecutive 15-min slots into
+      // larger slots of the requested duration
+      if (durationMinutes > 15) {
+        filtered = mergeIntoSlots(filtered, durationMs);
+      }
+      return { success: true, slots: filtered };
+    });
   }
 
-  function cacheSlots(startDate, endDate, durationMinutes, promise) {
-    _slotCache[startDate + '|' + endDate + '|' + durationMinutes] = promise;
+  /**
+   * Merge consecutive 15-min slots into slots of the target duration.
+   * E.g., four consecutive 15-min slots → one 60-min slot.
+   */
+  function mergeIntoSlots(fifteenMinSlots, durationMs) {
+    if (fifteenMinSlots.length === 0) return [];
+    var slots = [];
+    // Sort by start time
+    fifteenMinSlots.sort(function (a, b) {
+      return new Date(a.start).getTime() - new Date(b.start).getTime();
+    });
+    // Slide window: for each 15-min slot, check if there are enough
+    // consecutive slots to fill the target duration
+    for (var i = 0; i < fifteenMinSlots.length; i++) {
+      var candidateStart = new Date(fifteenMinSlots[i].start).getTime();
+      var candidateEnd = candidateStart + durationMs;
+      // Check that all 15-min slots needed are present and consecutive
+      var covered = candidateStart;
+      var valid = true;
+      for (var j = i; j < fifteenMinSlots.length && covered < candidateEnd; j++) {
+        var slotStart = new Date(fifteenMinSlots[j].start).getTime();
+        var slotEnd = new Date(fifteenMinSlots[j].end).getTime();
+        if (slotStart !== covered) { valid = false; break; }
+        covered = slotEnd;
+      }
+      if (valid && covered >= candidateEnd) {
+        slots.push({
+          start: fifteenMinSlots[i].start,
+          end: new Date(candidateEnd).toISOString(),
+        });
+      }
+    }
+    return slots;
   }
 
   async function apiCall(action, data) {
@@ -77,17 +137,16 @@ const ApiClient = (function () {
   }
 
   async function getAvailableSlots(startDate, endDate, durationMinutes) {
-    // Check cache first
-    var cached = getCachedSlots(startDate, endDate, durationMinutes);
-    if (cached) return cached;
+    // Try to serve from prefetched data (covers full booking window)
+    var fromPrefetch = tryServePrefetch(startDate, endDate, durationMinutes);
+    if (fromPrefetch) return fromPrefetch;
 
-    var promise = apiCall('getAvailableSlots', {
+    // Fallback: fresh API call
+    return apiCall('getAvailableSlots', {
       startDate: startDate,
       endDate: endDate,
       durationMinutes: durationMinutes,
     });
-    cacheSlots(startDate, endDate, durationMinutes, promise);
-    return promise;
   }
 
   async function createBooking(bookingData) {
