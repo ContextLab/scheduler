@@ -101,6 +101,44 @@ var BookingStore = (function () {
     return bookings;
   }
 
+  /**
+   * Find a confirmed booking whose time range overlaps [startISO, endISO].
+   *
+   * This is the authoritative, immediately-consistent double-booking guard:
+   * unlike the calendar (read back through the eventually-consistent
+   * Calendar.Events.list service), a row written here under the script lock is
+   * visible to the very next request. Call this inside LockService, before
+   * creating the calendar event.
+   *
+   * @param {string} startISO   requested start (ISO 8601)
+   * @param {string} endISO     requested end (ISO 8601)
+   * @param {string} excludeToken  token to ignore (e.g. the booking being
+   *                                rescheduled); pass null/'' to check all.
+   * @return {object|null} the clashing booking, or null if the slot is free.
+   */
+  function findOverlappingConfirmed(startISO, endISO, excludeToken) {
+    var reqStart = new Date(startISO).getTime();
+    var reqEnd = new Date(endISO).getTime();
+    if (isNaN(reqStart) || isNaN(reqEnd)) return null;
+
+    var all = getAll();
+    for (var i = 0; i < all.length; i++) {
+      var b = all[i];
+      if (b.status !== 'confirmed') continue;
+      if (excludeToken && b.token === excludeToken) continue;
+
+      // startTime/endTime may come back as ISO strings or as Date values
+      // (Sheets can auto-coerce datetime-looking cells); new Date() handles both.
+      var bStart = new Date(b.startTime).getTime();
+      var bEnd = new Date(b.endTime).getTime();
+      if (isNaN(bStart) || isNaN(bEnd)) continue;
+
+      // Half-open overlap: touching intervals (a.end === b.start) do not clash.
+      if (reqStart < bEnd && bStart < reqEnd) return b;
+    }
+    return null;
+  }
+
   function deleteOldBookings(olderThanDays) {
     var sheet = getSheet();
     var data = sheet.getDataRange().getValues();
@@ -129,6 +167,7 @@ var BookingStore = (function () {
     getByToken: getByToken,
     updateStatus: updateStatus,
     getAll: getAll,
+    findOverlappingConfirmed: findOverlappingConfirmed,
     deleteOldBookings: deleteOldBookings,
     HEADERS: HEADERS,
   };

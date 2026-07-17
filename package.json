@@ -1,0 +1,11 @@
+{
+  "name": "scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Booking scheduler — root test orchestration",
+  "scripts": {
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "node tests/backend/run-all.js",
+    "test:frontend": "npm --prefix tests/frontend test"
+  }
+}

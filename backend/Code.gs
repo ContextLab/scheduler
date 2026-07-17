@@ -138,16 +138,20 @@ function handleCreateBooking(data) {
   }
 
   try {
-    // Re-check slot availability (race condition prevention)
+    // Re-check slot availability inside the lock (race-condition prevention).
     var startDate = new Date(data.start);
     var endDate = new Date(data.end);
-    var duration = Math.round((endDate - startDate) / 60000);
-    var slots = CalendarService.getAvailableSlots(startDate, new Date(endDate.getTime() + 1), duration);
-    var slotAvailable = slots.some(function (s) {
-      return s.start === data.start && s.end === data.end;
-    });
 
-    if (!slotAvailable) {
+    // 1) Authoritative check against the Bookings sheet, which is immediately
+    //    consistent under the lock — unlike the calendar, which is read back via
+    //    the eventually-consistent Calendar.Events.list and can lag behind a
+    //    just-created event, letting two requests both pass a calendar-only check.
+    if (BookingStore.findOverlappingConfirmed(data.start, data.end, null)) {
+      return jsonResponse({ success: false, error: 'SLOT_TAKEN', message: 'This time slot is no longer available. Please select another time.' });
+    }
+
+    // 2) Calendar check: the requested interval must fall within free availability.
+    if (!CalendarService.isRangeAvailable(startDate, endDate)) {
       return jsonResponse({ success: false, error: 'SLOT_TAKEN', message: 'This time slot is no longer available. Please select another time.' });
     }
 
@@ -321,16 +325,14 @@ function handleRescheduleBooking(data) {
   }
 
   try {
-    // Check new slot availability
+    // Check new slot availability, excluding the booking being rescheduled.
     var newStart = new Date(data.newStart);
     var newEnd = new Date(data.newEnd);
-    var duration = Math.round((newEnd - newStart) / 60000);
-    var slots = CalendarService.getAvailableSlots(newStart, new Date(newEnd.getTime() + 1), duration);
-    var slotAvailable = slots.some(function (s) {
-      return s.start === data.newStart && s.end === data.newEnd;
-    });
 
-    if (!slotAvailable) {
+    if (BookingStore.findOverlappingConfirmed(data.newStart, data.newEnd, data.oldToken)) {
+      return jsonResponse({ success: false, error: 'SLOT_TAKEN', message: 'This time slot is no longer available. Please select another time.' });
+    }
+    if (!CalendarService.isRangeAvailable(newStart, newEnd)) {
       return jsonResponse({ success: false, error: 'SLOT_TAKEN', message: 'This time slot is no longer available. Please select another time.' });
     }
 

@@ -10,6 +10,7 @@ var App = (function () {
   var _selectedDuration = null;
   var _selectedSlot = null;
   var _errorTimeout = null;
+  var _submitting = false;
 
   var DURATION_OPTIONS = [
     { minutes: 15, label: '15', unit: 'min' },
@@ -266,6 +267,10 @@ var App = (function () {
   }
 
   function submitBooking(formData) {
+    // Re-entry guard: a double-click or slow-network re-click must not fire a
+    // second createBooking request for the same slot.
+    if (_submitting) return;
+
     if (!_selectedType || !_selectedDuration || !_selectedSlot) {
       showError('Please select a meeting type, duration, and time slot first.');
       return;
@@ -298,18 +303,30 @@ var App = (function () {
       notes: formData.notes || '',
     };
 
+    _submitting = true;
+    var submitBtn = document.getElementById('submit-booking');
+    if (submitBtn) submitBtn.disabled = true;
     showLoading();
 
     ApiClient.createBooking(bookingData)
       .then(function (result) {
         hideLoading();
+        _submitting = false;
+        // A booking changed availability; drop the stale page-load snapshot so
+        // any later slot fetch reflects the new state.
+        ApiClient.invalidatePrefetch();
         showConfirmation(result.booking, bookingData);
         goToStep(5);
       })
       .catch(function (err) {
         hideLoading();
+        _submitting = false;
+        if (submitBtn) submitBtn.disabled = false;
         if (err.code === 'SLOT_TAKEN') {
           showError('This time slot was just taken. Please select another time.', 5000);
+          // Refresh against fresh data, not the stale snapshot that still lists
+          // the taken slot.
+          ApiClient.invalidatePrefetch();
           goToStep(3);
           CalendarUI.refresh();
         } else {
@@ -393,11 +410,14 @@ var App = (function () {
     container.appendChild(box);
   }
 
-  // Initialize on DOM ready
+  // Initialize on DOM ready. In the browser the script runs during parsing
+  // (readyState 'loading'), so init is deferred to DOMContentLoaded. If loaded
+  // after the DOM is ready, only auto-init when the app root is actually present
+  // — this avoids crashing at import time in a bare test/module context.
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', init);
-    } else {
+    } else if (document.getElementById('meeting-types')) {
       init();
     }
   }

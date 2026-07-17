@@ -14,8 +14,6 @@ var CalendarService = (function () {
    * Get available booking slots within a date range for a given duration.
    */
   function getAvailableSlots(startDate, endDate, durationMinutes) {
-    var calendarId = Config.get('CALENDAR_ID');
-    var pattern = Config.get('AVAILABILITY_PATTERN');
     var minNoticeHours = parseInt(Config.get('MIN_NOTICE_HOURS'), 10) || 12;
     var maxAdvanceDays = parseInt(Config.get('MAX_ADVANCE_DAYS'), 10) || 90;
 
@@ -26,6 +24,29 @@ var CalendarService = (function () {
     if (startDate < earliest) startDate = earliest;
 
     if (startDate >= endDate) return [];
+
+    var freeWindows = computeFreeWindows(startDate, endDate);
+    if (freeWindows.length === 0) return [];
+
+    var slots = generateSlots(freeWindows, durationMinutes);
+
+    slots = slots.filter(function (slot) {
+      return new Date(slot.start) >= earliest;
+    });
+
+    return slots;
+  }
+
+  /**
+   * Compute the free availability windows within [startDate, endDate]:
+   * the designated calendar's availability windows minus all busy times
+   * (designated + conflict calendars). Shared by getAvailableSlots (which
+   * chops these into a slot grid) and isRangeAvailable (which tests
+   * containment of an exact requested interval).
+   */
+  function computeFreeWindows(startDate, endDate) {
+    var calendarId = Config.get('CALENDAR_ID');
+    var pattern = Config.get('AVAILABILITY_PATTERN');
 
     // Single fetch of designated calendar events (1 API call)
     var designatedEvents = listEvents(calendarId, startDate, endDate);
@@ -45,14 +66,43 @@ var CalendarService = (function () {
     }
     var mergedBusy = mergePeriods(allBusy);
 
-    var freeWindows = subtractBusyTimes(partition.windows, mergedBusy);
-    var slots = generateSlots(freeWindows, durationMinutes);
+    return subtractBusyTimes(partition.windows, mergedBusy);
+  }
 
-    slots = slots.filter(function (slot) {
-      return new Date(slot.start) >= earliest;
-    });
+  /**
+   * Is the exact interval [startDate, endDate] bookable?
+   *
+   * Returns true iff the interval is fully contained in a single free
+   * availability window and satisfies min-notice / max-advance bounds. This is
+   * the booking re-check: it validates the *requested interval*, not a position
+   * on a pre-generated slot grid. (The previous re-check regenerated a
+   * duration-stepped grid anchored to the window start and demanded an exact
+   * match, so any interval offset from that grid — e.g. a client-merged 45-min
+   * slot at 10:30 — was wrongly rejected as SLOT_TAKEN.)
+   */
+  function isRangeAvailable(startDate, endDate) {
+    var minNoticeHours = parseInt(Config.get('MIN_NOTICE_HOURS'), 10) || 12;
+    var maxAdvanceDays = parseInt(Config.get('MAX_ADVANCE_DAYS'), 10) || 90;
 
-    return slots;
+    var earliest = new Date(Date.now() + minNoticeHours * 60 * 60 * 1000);
+    var maxDate = new Date(Date.now() + maxAdvanceDays * 24 * 60 * 60 * 1000);
+
+    if (startDate >= endDate) return false;
+    if (startDate < earliest) return false;
+    if (endDate > maxDate) return false;
+
+    var s = startDate.getTime();
+    var e = endDate.getTime();
+
+    // Pad the fetch window slightly so the containing availability window and
+    // any straddling busy events are captured regardless of API boundary rules.
+    var freeWindows = computeFreeWindows(
+      new Date(s - 60 * 1000), new Date(e + 60 * 1000));
+
+    for (var i = 0; i < freeWindows.length; i++) {
+      if (freeWindows[i].start <= s && freeWindows[i].end >= e) return true;
+    }
+    return false;
   }
 
   /**
@@ -374,6 +424,7 @@ var CalendarService = (function () {
 
   return {
     getAvailableSlots: getAvailableSlots,
+    isRangeAvailable: isRangeAvailable,
     debug: debug,
   };
 })();

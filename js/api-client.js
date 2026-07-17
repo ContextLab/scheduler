@@ -30,6 +30,19 @@ const ApiClient = (function () {
   }
 
   /**
+   * Discard the prefetched availability snapshot.
+   *
+   * The prefetch is a page-load snapshot; without invalidation, every slot list
+   * (including the "pick another time" refresh after a SLOT_TAKEN) is served
+   * from stale data, so students keep seeing slots that were booked since load.
+   * Call this after any booking so the next slot fetch hits the backend fresh.
+   */
+  function invalidatePrefetch() {
+    _prefetchPromise = null;
+    _prefetchRange = null;
+  }
+
+  /**
    * Try to serve a slot request from the prefetched data.
    * The prefetch uses 15-min slots; for larger durations we filter
    * to only include slots whose time boundaries align with the requested duration.
@@ -186,6 +199,7 @@ const ApiClient = (function () {
     apiCall: apiCall,
     getAvailableSlots: getAvailableSlots,
     prefetchSlots: prefetchSlots,
+    invalidatePrefetch: invalidatePrefetch,
     createBooking: createBooking,
     cancelBooking: cancelBooking,
     getBooking: getBooking,
