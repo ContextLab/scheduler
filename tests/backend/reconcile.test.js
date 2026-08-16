@@ -13,7 +13,7 @@ const { loadBackend } = require('./gas-harness');
 const { createRunner } = require('./_runner');
 
 const CAL = 'cal-primary';
-const FILES = ['Booking.gs', 'Reconcile.gs'];
+const FILES = ['Booking.gs', 'Calendar.gs', 'Reconcile.gs'];
 
 const CONFIG = {
   CALENDAR_ID: CAL,
@@ -33,8 +33,10 @@ function makeCtx(specs) {
 }
 
 // Seed a fake pre-existing calendar event with a specific id into the harness.
-function seedEvent(ctx, id, deleted) {
-  ctx._createdEvents.push({ id: id, _calendarId: CAL, _deleted: !!deleted, _resource: {} });
+// deleted=true models a purged event (Events.get 404s); status='cancelled' models
+// a soft-deleted event that Events.get still returns but flagged cancelled.
+function seedEvent(ctx, id, deleted, status) {
+  ctx._createdEvents.push({ id: id, _calendarId: CAL, _deleted: !!deleted, _resource: status ? { status: status } : {} });
 }
 
 const r = createRunner('reconcileBookings (sheet/calendar drift healer)');
@@ -75,6 +77,16 @@ r.test('is a no-op when every confirmed booking still has its event', function (
   assert.strictEqual(res.reconciled, 0);
   assert.strictEqual(ctx.BookingStore.getByToken('t1').status, 'confirmed');
   assert.strictEqual(ctx.BookingStore.getByToken('t2').status, 'confirmed');
+});
+
+r.test('cancels a row whose event still resolves but is status=cancelled (soft-deleted)', function () {
+  const ctx = makeCtx([
+    { token: 't-soft', eventId: 'evt-soft', status: 'confirmed', startTime: '2026-09-04T14:00:00.000Z', endTime: '2026-09-04T14:15:00.000Z' },
+  ]);
+  seedEvent(ctx, 'evt-soft', false, 'cancelled'); // Events.get returns it, flagged cancelled
+  const res = ctx.reconcileBookings();
+  assert.strictEqual(res.reconciled, 1, 'a cancelled-status event must count as gone');
+  assert.strictEqual(ctx.BookingStore.getByToken('t-soft').status, 'cancelled');
 });
 
 r.test('never cancels a confirmed row with a blank eventId (unverifiable => keep)', function () {

@@ -30,11 +30,6 @@ function reconcileBookings() {
     return { success: false, error: 'Could not acquire lock; try again.' };
   }
   try {
-    var calendar = CalendarApp.getCalendarById(Config.get('CALENDAR_ID'));
-    if (!calendar) {
-      return { success: false, error: 'Calendar not found: ' + Config.get('CALENDAR_ID') };
-    }
-
     var ss = SpreadsheetApp.openById(Config.get('SPREADSHEET_ID'));
     var sheet = ss.getSheetByName('Bookings');
     if (!sheet) return { success: false, error: 'No Bookings sheet found.' };
@@ -73,14 +68,10 @@ function reconcileBookings() {
         if (!isNaN(created) && (now - created) < graceMs) continue; // too fresh to trust as a ghost
       }
 
-      var exists;
-      try {
-        exists = !!calendar.getEventById(eventId);
-      } catch (err) {
-        Logger.log('reconcile getEventById error for ' + eventId + ': ' + err.message);
-        continue; // transient failure -> leave the row alone
-      }
-      if (exists) continue;
+      // Authoritative existence check via the Advanced Calendar API. It fails
+      // closed (returns true) on any transient/uncertain error, so we only ever
+      // cancel a row whose event is definitively gone or cancelled.
+      if (CalendarService.eventIsActive(eventId)) continue;
 
       rowVals[statusCol] = 'cancelled';
       if (cancelledAtCol !== -1) rowVals[cancelledAtCol] = nowIso;

@@ -522,14 +522,10 @@ function isStaleGhost(booking) {
     return false; // fresh row — trust it (guards the propagation-lag race)
   }
   if (!booking.eventId) return false; // unverifiable — treat as a real conflict
-  try {
-    var calendar = CalendarApp.getCalendarById(Config.get('CALENDAR_ID'));
-    if (!calendar) return false; // can't verify — treat as a real conflict
-    return !calendar.getEventById(booking.eventId); // event gone => ghost
-  } catch (err) {
-    Logger.log('isStaleGhost lookup error for ' + booking.eventId + ': ' + err.message);
-    return false; // API hiccup — treat as a real conflict
-  }
+  // Authoritative existence check via the Advanced Calendar API. eventIsActive
+  // fails closed (returns true) on any uncertain/transient error, so a ghost is
+  // only ever declared when the event is definitively gone or cancelled.
+  return !CalendarService.eventIsActive(booking.eventId);
 }
 
 function jsonResponse(data) {

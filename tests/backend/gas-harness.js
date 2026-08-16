@@ -69,6 +69,20 @@ function loadBackend(opts, files) {
         }
         return { items: items, nextPageToken: null };
       },
+      // Direct lookup by id. Mirrors the live Advanced API: a deleted event
+      // throws a 404-style "Not Found"; a cancelled event returns status
+      // 'cancelled'; an active event returns status 'confirmed'.
+      get: function (_calendarId, eventId) {
+        for (var i = 0; i < createdEvents.length; i++) {
+          var ce = createdEvents[i];
+          var bareId = String(ce.id).replace(/@google\.com$/i, '');
+          if (bareId === eventId || ce.id === eventId) {
+            if (ce._deleted) throw new Error('API call to calendar.events.get failed with error: Not Found');
+            return (ce._resource && ce._resource.status) ? ce._resource : { status: 'confirmed' };
+          }
+        }
+        throw new Error('API call to calendar.events.get failed with error: Not Found');
+      },
     },
   };
 

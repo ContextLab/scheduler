@@ -422,9 +422,43 @@ var CalendarService = (function () {
     };
   }
 
+  /**
+   * Does an ACTIVE (non-cancelled) calendar event with this id still exist?
+   *
+   * Uses the Advanced Calendar API (Calendar.Events.get) — the same source of
+   * truth as availability — because CalendarApp.getEventById() does NOT reliably
+   * report a recently deleted/cancelled event as gone (it can return a stale
+   * object or throw), which would leave a "ghost" booking blocking its slot.
+   *
+   * Bookings are created via CalendarApp, whose event id looks like
+   * "<base32>@google.com"; the Advanced API keys on the bare "<base32>".
+   *
+   * Fails CLOSED: a definitive not-found/deleted (or status 'cancelled') means
+   * gone (returns false); ANY other error (transient/permission) returns true so
+   * a hiccup can never make a live booking look like a ghost and open a double-book.
+   */
+  function eventIsActive(eventId) {
+    if (!eventId) return true; // unverifiable -> treat as still active (fail closed)
+    var calId = Config.get('CALENDAR_ID');
+    var apiId = String(eventId).replace(/@google\.com$/i, '').replace(/@.*$/, '');
+    try {
+      var ev = Calendar.Events.get(calId, apiId);
+      return !!ev && ev.status !== 'cancelled';
+    } catch (err) {
+      var msg = (err && err.message ? err.message : '').toLowerCase();
+      if (msg.indexOf('not found') !== -1 || msg.indexOf('notfound') !== -1 ||
+          msg.indexOf('deleted') !== -1 || msg.indexOf('404') !== -1) {
+        return false; // definitively gone
+      }
+      Logger.log('eventIsActive error for ' + eventId + ': ' + (err && err.message));
+      return true; // transient/unknown -> fail closed (treat as active)
+    }
+  }
+
   return {
     getAvailableSlots: getAvailableSlots,
     isRangeAvailable: isRangeAvailable,
+    eventIsActive: eventIsActive,
     debug: debug,
   };
 })();
