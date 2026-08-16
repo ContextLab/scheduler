@@ -522,10 +522,10 @@ function isStaleGhost(booking) {
     return false; // fresh row — trust it (guards the propagation-lag race)
   }
   if (!booking.eventId) return false; // unverifiable — treat as a real conflict
-  // Authoritative existence check via the Advanced Calendar API. eventIsActive
-  // fails closed (returns true) on any uncertain/transient error, so a ghost is
-  // only ever declared when the event is definitively gone or cancelled.
-  return !CalendarService.eventIsActive(booking.eventId);
+  // eventIsActive fails closed (returns true) on any uncertain/transient error,
+  // so a ghost is only ever declared when the calendar is read successfully and
+  // the event is genuinely gone.
+  return !CalendarService.eventIsActive(booking.eventId, booking.startTime, booking.endTime);
 }
 
 function jsonResponse(data) {

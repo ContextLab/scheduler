@@ -423,35 +423,37 @@ var CalendarService = (function () {
   }
 
   /**
-   * Does an ACTIVE (non-cancelled) calendar event with this id still exist?
+   * Does an ACTIVE (non-cancelled) calendar event with this id still exist at the
+   * booking's time?
    *
-   * Uses the Advanced Calendar API (Calendar.Events.get) — the same source of
-   * truth as availability — because CalendarApp.getEventById() does NOT reliably
-   * report a recently deleted/cancelled event as gone (it can return a stale
-   * object or throw), which would leave a "ghost" booking blocking its slot.
+   * Uses CalendarApp.getEvents() over the booking's own window: it returns ONLY
+   * active events, so a deleted or cancelled event is simply absent. This is
+   * deliberately NOT CalendarApp.getEventById() (which returns a stale object or
+   * throws for a recently deleted/cancelled event) and NOT the Advanced Calendar
+   * API (which isn't enabled in this project — Calendar.Events.get throws
+   * "Calendar is not defined"). CalendarApp is always available.
    *
-   * Bookings are created via CalendarApp, whose event id looks like
-   * "<base32>@google.com"; the Advanced API keys on the bare "<base32>".
-   *
-   * Fails CLOSED: a definitive not-found/deleted (or status 'cancelled') means
-   * gone (returns false); ANY other error (transient/permission) returns true so
-   * a hiccup can never make a live booking look like a ghost and open a double-book.
+   * Fails CLOSED: any error, unusable dates, or a missing calendar returns true
+   * (treat as still active) so a hiccup can never make a live booking look like a
+   * ghost and open a double-booking. A ghost is declared only when the calendar
+   * is read successfully and no active event carries this id.
    */
-  function eventIsActive(eventId) {
-    if (!eventId) return true; // unverifiable -> treat as still active (fail closed)
-    var calId = Config.get('CALENDAR_ID');
-    var apiId = String(eventId).replace(/@google\.com$/i, '').replace(/@.*$/, '');
+  function eventIsActive(eventId, startISO, endISO) {
+    if (!eventId) return true; // unverifiable -> fail closed
     try {
-      var ev = Calendar.Events.get(calId, apiId);
-      return !!ev && ev.status !== 'cancelled';
-    } catch (err) {
-      var msg = (err && err.message ? err.message : '').toLowerCase();
-      if (msg.indexOf('not found') !== -1 || msg.indexOf('notfound') !== -1 ||
-          msg.indexOf('deleted') !== -1 || msg.indexOf('404') !== -1) {
-        return false; // definitively gone
+      var cal = CalendarApp.getCalendarById(Config.get('CALENDAR_ID'));
+      if (!cal) return true;
+      var s = new Date(startISO), e = new Date(endISO);
+      if (isNaN(s.getTime()) || isNaN(e.getTime())) return true; // can't verify -> fail closed
+      // Pad by a second so an event sharing an exact boundary is still returned.
+      var events = cal.getEvents(new Date(s.getTime() - 1000), new Date(e.getTime() + 1000));
+      for (var i = 0; i < events.length; i++) {
+        if (events[i].getId() === eventId) return true;
       }
+      return false; // read succeeded, id absent -> event is gone
+    } catch (err) {
       Logger.log('eventIsActive error for ' + eventId + ': ' + (err && err.message));
-      return true; // transient/unknown -> fail closed (treat as active)
+      return true; // transient/unknown -> fail closed
     }
   }
 

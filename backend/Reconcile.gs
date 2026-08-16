@@ -44,6 +44,7 @@ function reconcileBookings() {
     var cancelledAtCol = header.indexOf('cancelledAt');
     var tokenCol = header.indexOf('token');
     var startCol = header.indexOf('startTime');
+    var endCol = header.indexOf('endTime');
     var emailCol = header.indexOf('email');
     if (statusCol === -1 || eventIdCol === -1) {
       return { success: false, error: 'Unexpected sheet schema (missing status/eventId column).' };
@@ -68,10 +69,10 @@ function reconcileBookings() {
         if (!isNaN(created) && (now - created) < graceMs) continue; // too fresh to trust as a ghost
       }
 
-      // Authoritative existence check via the Advanced Calendar API. It fails
-      // closed (returns true) on any transient/uncertain error, so we only ever
-      // cancel a row whose event is definitively gone or cancelled.
-      if (CalendarService.eventIsActive(eventId)) continue;
+      // Existence check over the booking's window (active events only). Fails
+      // closed on any transient/uncertain error, so we only ever cancel a row
+      // whose event is definitively gone.
+      if (CalendarService.eventIsActive(eventId, rowVals[startCol], rowVals[endCol])) continue;
 
       rowVals[statusCol] = 'cancelled';
       if (cancelledAtCol !== -1) rowVals[cancelledAtCol] = nowIso;

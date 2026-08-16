@@ -116,6 +116,27 @@ function loadBackend(opts, files) {
           if (!found || found._deleted) return null;
           return { deleteEvent: function () { found._deleted = true; } };
         },
+        // Returns only ACTIVE events overlapping [start, end] (deleted ones are
+        // absent), mirroring CalendarApp.getEvents used by eventIsActive.
+        getEvents: function (start, end) {
+          var qs = new Date(start).getTime(), qe = new Date(end).getTime();
+          var out = [];
+          for (var i = 0; i < createdEvents.length; i++) {
+            var ce = createdEvents[i];
+            if (ce._calendarId !== calId || ce._deleted) continue;
+            if (ce.start === undefined || ce.end === undefined) continue;
+            var es = new Date(ce.start).getTime(), ee = new Date(ce.end).getTime();
+            if (es < qe && qs < ee) { // overlap
+              out.push({
+                getId: (function (c) { return function () { return c.id; }; })(ce),
+                getStartTime: (function (c) { return function () { return new Date(c.start); }; })(ce),
+                getEndTime: (function (c) { return function () { return new Date(c.end); }; })(ce),
+                getTitle: (function (c) { return function () { return c.title || ''; }; })(ce),
+              });
+            }
+          }
+          return out;
+        },
       };
     },
   };
