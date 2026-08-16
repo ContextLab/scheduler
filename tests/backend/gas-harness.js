@@ -96,7 +96,10 @@ function loadBackend(opts, files) {
           for (var i = 0; i < createdEvents.length; i++) {
             if (createdEvents[i].id === id) { found = createdEvents[i]; break; }
           }
-          if (!found) return null;
+          // A deleted event is not retrievable in real GAS — getEventById returns
+          // null. This lets tests model an event removed out-of-band (directly on
+          // the calendar) by flipping _deleted without touching the sheet row.
+          if (!found || found._deleted) return null;
           return { deleteEvent: function () { found._deleted = true; } };
         },
       };
@@ -137,10 +140,20 @@ function loadBackend(opts, files) {
   // --- Misc GAS globals ---
   var uuidCounter = 0;
   sandbox.Utilities = { getUuid: function () { uuidCounter++; return 'token-' + uuidCounter; } };
+  // Stateful in-memory cache so rate-limiting (keyed per client) is exercisable.
+  // TTL is ignored (tests fire synchronously); counts accumulate within a run.
+  const cacheStore = {};
+  sandbox._cacheStore = cacheStore;
   sandbox.CacheService = {
-    getScriptCache: function () { return { get: function () { return null; }, put: function () {} }; },
+    getScriptCache: function () {
+      return {
+        get: function (k) { return Object.prototype.hasOwnProperty.call(cacheStore, k) ? cacheStore[k] : null; },
+        put: function (k, v) { cacheStore[k] = v; },
+      };
+    },
   };
-  sandbox.MailApp = { getRemainingDailyQuota: function () { return 50; } };
+  var mailQuota = opts.mailQuota === undefined ? 50 : opts.mailQuota;
+  sandbox.MailApp = { getRemainingDailyQuota: function () { return mailQuota; } };
 
   // --- SpreadsheetApp stub backing BookingStore via an in-memory 2D array ---
   if (bookingRows) {
@@ -150,8 +163,29 @@ function loadBackend(opts, files) {
         return { getValues: function () { return sheet._rows; } };
       },
       appendRow: function (row) { sheet._rows.push(row.slice()); },
-      getRange: function (row, col) {
-        return { setValue: function (v) { sheet._rows[row - 1][col - 1] = v; } };
+      getRange: function (row, col, numRows, numCols) {
+        if (numRows === undefined) {
+          return {
+            setValue: function (v) { sheet._rows[row - 1][col - 1] = v; },
+            getValue: function () { return sheet._rows[row - 1][col - 1]; },
+          };
+        }
+        return {
+          setValues: function (vals) {
+            for (var r = 0; r < numRows; r++) {
+              for (var c = 0; c < numCols; c++) sheet._rows[row - 1 + r][col - 1 + c] = vals[r][c];
+            }
+          },
+          getValues: function () {
+            var out = [];
+            for (var r = 0; r < numRows; r++) {
+              var rr = [];
+              for (var c = 0; c < numCols; c++) rr.push(sheet._rows[row - 1 + r][col - 1 + c]);
+              out.push(rr);
+            }
+            return out;
+          },
+        };
       },
       deleteRow: function (row) { sheet._rows.splice(row - 1, 1); },
     };
@@ -162,6 +196,7 @@ function loadBackend(opts, files) {
           insertSheet: function () { return sheet; },
         };
       },
+      flush: function () {},
     };
     sandbox._sheet = sheet;
   }

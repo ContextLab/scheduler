@@ -206,4 +206,113 @@ r.test('rejects a reschedule onto another confirmed booking', function () {
   assert.strictEqual(res.error, 'SLOT_TAKEN');
 });
 
+// Backdate every booking row's createdAt so the ghost guard's freshness grace
+// (which trusts recent rows to defeat calendar propagation lag) no longer applies.
+function ageAllRows(ctx, minutesAgo) {
+  const ci = ctx.BookingStore.HEADERS.indexOf('createdAt');
+  const old = new Date(Date.now() - minutesAgo * 60 * MIN).toISOString();
+  for (let i = 1; i < ctx._sheet._rows.length; i++) ctx._sheet._rows[i][ci] = old;
+}
+
+// --- Ghost row: an OLD confirmed booking whose calendar event was deleted
+//     out-of-band must NOT block the slot forever (this was a live SLOT_TAKEN bug). ---
+r.test('an old slot frees up when its confirmed event is deleted directly on the calendar', function () {
+  const ctx = makeCtx();
+  const start = ctx._winStart + 60 * MIN, end = ctx._winStart + 90 * MIN;
+  const first = parseResponse(ctx.handleCreateBooking(bookingData(ctx, start, end)));
+  assert.strictEqual(first.success, true);
+  assert.strictEqual(ctx._createdEvents.length, 1);
+
+  // Owner deletes the meeting straight from Google Calendar (not via the cancel
+  // link): the event is gone but the sheet row still says 'confirmed'. The row is
+  // old (not a just-created booking that could be masking calendar lag).
+  ctx._createdEvents[0]._deleted = true;
+  ageAllRows(ctx, 60);
+
+  const second = parseResponse(ctx.handleCreateBooking(
+    bookingData(ctx, start, end, { firstName: 'Alex', email: 'alex@example.edu' })));
+  assert.strictEqual(second.success, true, 'stale ghost row must not block: ' + JSON.stringify(second));
+});
+
+r.test('a FRESH row whose event is missing STILL blocks (defeats calendar-lag double-booking)', function () {
+  const ctx = makeCtx();
+  const start = ctx._winStart + 60 * MIN, end = ctx._winStart + 90 * MIN;
+  assert.strictEqual(parseResponse(ctx.handleCreateBooking(bookingData(ctx, start, end))).success, true);
+  // Simulate the race: the just-created event isn't visible via getEventById yet.
+  ctx._createdEvents[0]._deleted = true; // stands in for "not yet readable"
+  // Row is fresh (createdAt = now), so it must be trusted, NOT treated as a ghost.
+  const second = parseResponse(ctx.handleCreateBooking(
+    bookingData(ctx, start, end, { firstName: 'Alex', email: 'alex@example.edu' })));
+  assert.strictEqual(second.success, false, 'a fresh row must never be treated as a ghost');
+  assert.strictEqual(second.error, 'SLOT_TAKEN');
+});
+
+r.test('a still-live confirmed booking DOES block the slot (double-booking guard intact)', function () {
+  const ctx = makeCtx();
+  const start = ctx._winStart + 60 * MIN, end = ctx._winStart + 90 * MIN;
+  assert.strictEqual(parseResponse(ctx.handleCreateBooking(bookingData(ctx, start, end))).success, true);
+  ageAllRows(ctx, 60); // even when old, a row whose event still exists is a real conflict
+  const second = parseResponse(ctx.handleCreateBooking(
+    bookingData(ctx, start, end, { firstName: 'Alex', email: 'alex@example.edu' })));
+  assert.strictEqual(second.success, false);
+  assert.strictEqual(second.error, 'SLOT_TAKEN');
+});
+
+r.test('an old confirmed row with a blank eventId fails closed (still blocks the slot)', function () {
+  const ctx = makeCtx();
+  const H = ctx.BookingStore.HEADERS;
+  const start = ctx._winStart + 60 * MIN, end = ctx._winStart + 90 * MIN;
+  // Seed an old confirmed row with NO eventId (e.g. a schema-drift artifact).
+  const spec = {
+    token: 'blank-evt', eventId: '', status: 'confirmed',
+    startTime: new Date(start).toISOString(), endTime: new Date(end).toISOString(),
+    createdAt: new Date(Date.now() - 60 * 60 * MIN).toISOString(),
+  };
+  ctx._sheet._rows.push(H.map(function (h) { return spec[h] !== undefined ? spec[h] : ''; }));
+  const res = parseResponse(ctx.handleCreateBooking(
+    bookingData(ctx, start, end, { firstName: 'Alex', email: 'alex@example.edu' })));
+  assert.strictEqual(res.success, false, 'unverifiable row must not be treated as a ghost');
+  assert.strictEqual(res.error, 'SLOT_TAKEN');
+});
+
+r.test('reschedule is not blocked by an OLD ghost row at the target slot', function () {
+  const ctx = makeCtx();
+  const occ = parseResponse(ctx.handleCreateBooking(
+    bookingData(ctx, ctx._winStart + 75 * MIN, ctx._winStart + 105 * MIN,
+      { firstName: 'Occ', email: 'occ@example.edu' })));
+  assert.strictEqual(occ.success, true);
+  ctx._createdEvents[0]._deleted = true; // occupant's event removed on the calendar
+
+  const b = parseResponse(ctx.handleCreateBooking(
+    bookingData(ctx, ctx._winStart + 15 * MIN, ctx._winStart + 45 * MIN)));
+  assert.strictEqual(b.success, true);
+  ageAllRows(ctx, 60); // both rows now old; the occupant is a genuine ghost
+
+  const res = parseResponse(ctx.handleRescheduleBooking({
+    oldToken: b.booking.token,
+    newStart: new Date(ctx._winStart + 75 * MIN).toISOString(),
+    newEnd: new Date(ctx._winStart + 105 * MIN).toISOString(),
+  }));
+  assert.strictEqual(res.success, true, 'reschedule onto a freed (ghost) slot should work: ' + JSON.stringify(res));
+});
+
+// --- Honeypot: a filled hidden field marks the request as a bot; reject it
+//     without creating an event, writing a row, or sending email. ---
+r.test('rejects a booking whose honeypot field is filled (bot submission)', function () {
+  const ctx = makeCtx();
+  const data = bookingData(ctx, ctx._winStart + 60 * MIN, ctx._winStart + 90 * MIN, { hp: 'http://spam.example' });
+  const res = parseResponse(ctx.handleCreateBooking(data));
+  assert.strictEqual(res.success, false);
+  assert.strictEqual(ctx._createdEvents.length, 0, 'no event for a bot submission');
+  assert.strictEqual(ctx._sheet._rows.length, 1, 'no booking row for a bot submission');
+  assert.strictEqual(ctx._sentEmails.length, 0, 'no email for a bot submission');
+});
+
+r.test('a booking with an empty honeypot field books normally', function () {
+  const ctx = makeCtx();
+  const data = bookingData(ctx, ctx._winStart + 60 * MIN, ctx._winStart + 90 * MIN, { hp: '' });
+  const res = parseResponse(ctx.handleCreateBooking(data));
+  assert.strictEqual(res.success, true, JSON.stringify(res));
+});
+
 process.exit(r.done() === 0 ? 0 : 1);

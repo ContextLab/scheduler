@@ -301,6 +301,7 @@ var App = (function () {
       location: locationValue,
       purpose: formData.purpose || '',
       notes: formData.notes || '',
+      hp: formData.hp || '',
     };
 
     _submitting = true;

@@ -16,6 +16,14 @@ function doGet(e) {
     });
   }
 
+  // Throttle the key-gated admin actions so the CLEANUP_KEY can't be brute-forced
+  // through the unauthenticated web app.
+  if (action === 'cleanup' || action === 'debug') {
+    if (!rateBump(CacheService.getScriptCache(), 'rlg_' + action, 10, 60)) {
+      return jsonResponse({ success: false, error: 'RATE_LIMITED', message: 'Too many requests.' });
+    }
+  }
+
   if (action === 'cleanup') {
     var key = (e && e.parameter && e.parameter.key) || '';
     var cleanupKey = Config.get('CLEANUP_KEY');
@@ -60,17 +68,17 @@ function doPost(e) {
     return jsonResponse({ success: false, error: 'MISSING_ACTION', message: 'Request must include an action field' });
   }
 
-  // Rate limiting via CacheService
-  var clientId = requestData.clientId || 'anonymous';
-  var cacheKey = 'rate_' + clientId;
-  var cache = CacheService.getScriptCache();
-  var requestCount = parseInt(cache.get(cacheKey) || '0', 10);
-  if (requestCount >= 30) {
-    return jsonResponse({ success: false, error: 'RATE_LIMITED', message: 'Too many requests. Please wait a minute and try again.' });
-  }
-  cache.put(cacheKey, String(requestCount + 1), 60); // 60-second window
-
   try {
+    // Rate limiting via CacheService. Buckets are keyed PER CLIENT so a busy
+    // period (e.g. a whole class opening the booking link at once) can't let one
+    // visitor exhaust a shared bucket and lock everyone else out — the bug that
+    // made real bookings fail with no event and no email. Kept inside the
+    // try/catch so a transient CacheService/Config error degrades to a clean JSON
+    // error, never an unparseable 500.
+    if (!rateLimitOk(action, requestData)) {
+      return jsonResponse({ success: false, error: 'RATE_LIMITED', message: 'Too many requests. Please wait a minute and try again.' });
+    }
+
     switch (action) {
       case 'getAvailableSlots':
         return handleGetAvailableSlots(requestData);
@@ -112,6 +120,14 @@ function handleGetAvailableSlots(data) {
 }
 
 function handleCreateBooking(data) {
+  // Honeypot: a hidden form field real users never see. A filled value means an
+  // automated bot walked the form, so reject before doing any work — no event,
+  // no row, no email. The message is deliberately generic so bots can't tell the
+  // honeypot tripped them.
+  if (data.hp) {
+    return jsonResponse({ success: false, error: 'VALIDATION_ERROR', message: 'Your booking could not be processed.' });
+  }
+
   // Validate required fields
   var required = ['meetingTypeId', 'meetingTypeName', 'start', 'end', 'firstName', 'lastName', 'email', 'format', 'location'];
   for (var i = 0; i < required.length; i++) {
@@ -146,7 +162,7 @@ function handleCreateBooking(data) {
     //    consistent under the lock — unlike the calendar, which is read back via
     //    the eventually-consistent Calendar.Events.list and can lag behind a
     //    just-created event, letting two requests both pass a calendar-only check.
-    if (BookingStore.findOverlappingConfirmed(data.start, data.end, null)) {
+    if (BookingStore.findOverlappingConfirmed(data.start, data.end, null, isStaleGhost)) {
       return jsonResponse({ success: false, error: 'SLOT_TAKEN', message: 'This time slot is no longer available. Please select another time.' });
     }
 
@@ -213,6 +229,11 @@ function handleCreateBooking(data) {
       },
     });
   } finally {
+    // Persist pending sheet writes BEFORE releasing the lock, so the next request
+    // to take the lock sees this booking's row. Without the flush the row might
+    // not commit until this execution ends (after releaseLock), leaving a window
+    // where a concurrent booking reads a stale sheet and double-books.
+    try { SpreadsheetApp.flush(); } catch (e) { /* nothing pending */ }
     lock.releaseLock();
   }
 }
@@ -329,7 +350,7 @@ function handleRescheduleBooking(data) {
     var newStart = new Date(data.newStart);
     var newEnd = new Date(data.newEnd);
 
-    if (BookingStore.findOverlappingConfirmed(data.newStart, data.newEnd, data.oldToken)) {
+    if (BookingStore.findOverlappingConfirmed(data.newStart, data.newEnd, data.oldToken, isStaleGhost)) {
       return jsonResponse({ success: false, error: 'SLOT_TAKEN', message: 'This time slot is no longer available. Please select another time.' });
     }
     if (!CalendarService.isRangeAvailable(newStart, newEnd)) {
@@ -414,11 +435,102 @@ function handleRescheduleBooking(data) {
       },
     });
   } finally {
+    // Persist pending sheet writes BEFORE releasing the lock, so the next request
+    // to take the lock sees this booking's row. Without the flush the row might
+    // not commit until this execution ends (after releaseLock), leaving a window
+    // where a concurrent booking reads a stale sheet and double-books.
+    try { SpreadsheetApp.flush(); } catch (e) { /* nothing pending */ }
     lock.releaseLock();
   }
 }
 
 // --- Helper Functions ---
+
+/**
+ * Increment a cache counter within a window; return false once it hits `limit`.
+ * Best-effort: the read-modify-write is not atomic, so under heavy concurrency a
+ * counter can undercount and let a few extra requests through — it errs toward
+ * allowing, never toward wrongly blocking, so it can't starve legitimate users.
+ */
+function rateBump(cache, key, limit, windowSec) {
+  if (limit <= 0) return true; // 0/blank disables that particular limit
+  var n = parseInt(cache.get(key) || '0', 10);
+  if (n >= limit) return false;
+  cache.put(key, String(n + 1), windowSec);
+  return true;
+}
+
+/**
+ * Per-client, read/write-split rate limiter.
+ *
+ * Reads (availability/lookup) get a generous per-client budget. Writes
+ * (create/cancel/reschedule) get a tighter per-client budget, a per-email budget
+ * (so one person — or a naive abuser reusing an address — can't spray bookings),
+ * and a high global backstop. Keying per client is the fix for the old single
+ * 'anonymous' bucket that let any load spike lock every visitor out.
+ *
+ * A public, unauthenticated endpoint can't fully stop a determined attacker who
+ * rotates clientId AND email (that needs a CAPTCHA / sign-in); these limits plus
+ * the honeypot stop naive bots and accidental floods while never blocking a
+ * realistic class-sized burst. Limits are Config-tunable without a code change.
+ *
+ * @return {boolean} true if the request is allowed, false if it should be throttled.
+ */
+function rateLimitOk(action, requestData) {
+  var WRITE_ACTIONS = { createBooking: true, cancelBooking: true, rescheduleBooking: true };
+  var cache = CacheService.getScriptCache();
+  var clientId = requestData && requestData.clientId;
+  var cid = clientId ? String(clientId).slice(0, 64) : 'anon';
+  var MINUTE = 60;
+
+  if (WRITE_ACTIONS[action]) {
+    var perClient = parseInt(Config.get('RATE_LIMIT_WRITE_PER_CLIENT'), 10) || 15;
+    var global = parseInt(Config.get('RATE_LIMIT_WRITE_GLOBAL'), 10) || 300;
+    var perEmail = parseInt(Config.get('RATE_LIMIT_WRITE_PER_EMAIL'), 10) || 10;
+    if (!rateBump(cache, 'rlw_' + cid, perClient, MINUTE)) return false;
+    // Per-email budget over a longer window (a human books a handful of meetings,
+    // not dozens). Keyed on the normalized email when present.
+    var email = requestData && requestData.email ? String(requestData.email).trim().toLowerCase().slice(0, 128) : '';
+    if (email && !rateBump(cache, 'rlwe_' + email, perEmail, 60 * MINUTE)) return false;
+    if (!rateBump(cache, 'rlw_global', global, MINUTE)) return false;
+    return true;
+  }
+
+  var readLimit = parseInt(Config.get('RATE_LIMIT_READ_PER_CLIENT'), 10) || 120;
+  return rateBump(cache, 'rlr_' + cid, readLimit, MINUTE);
+}
+
+/**
+ * Is this overlapping confirmed booking a stale "ghost" — its calendar event was
+ * removed out-of-band (deleted/moved directly on the calendar) so the row no
+ * longer represents a real meeting and must stop blocking the slot?
+ *
+ * Fails CLOSED (returns false → treat as a real conflict) in every uncertain
+ * case, so it can never open a double-booking:
+ *   - A FRESH row (createdAt within the grace window) is always trusted. A just-
+ *     created event may not yet be visible via getEventById in a concurrent
+ *     execution, so treating a fresh row as a ghost would reintroduce the exact
+ *     calendar read-after-write race the sheet check exists to prevent.
+ *   - A row with a blank/unparseable eventId can't be verified → real conflict.
+ *   - A calendar API error or missing calendar → real conflict.
+ * Only an OLD row whose event id verifiably resolves to nothing is a ghost.
+ */
+function isStaleGhost(booking) {
+  var graceMin = parseInt(Config.get('GHOST_GRACE_MINUTES'), 10) || 10;
+  var createdAt = new Date(booking.createdAt).getTime();
+  if (!isNaN(createdAt) && (Date.now() - createdAt) < graceMin * 60 * 1000) {
+    return false; // fresh row — trust it (guards the propagation-lag race)
+  }
+  if (!booking.eventId) return false; // unverifiable — treat as a real conflict
+  try {
+    var calendar = CalendarApp.getCalendarById(Config.get('CALENDAR_ID'));
+    if (!calendar) return false; // can't verify — treat as a real conflict
+    return !calendar.getEventById(booking.eventId); // event gone => ghost
+  } catch (err) {
+    Logger.log('isStaleGhost lookup error for ' + booking.eventId + ': ' + err.message);
+    return false; // API hiccup — treat as a real conflict
+  }
+}
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
