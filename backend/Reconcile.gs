@@ -69,6 +69,15 @@ function reconcileBookings() {
         if (!isNaN(created) && (now - created) < graceMs) continue; // too fresh to trust as a ghost
       }
 
+      // Leave history alone: reconciliation exists to free FUTURE bookable slots
+      // that a deleted event is blocking. A past meeting's slot isn't bookable, and
+      // its event being gone may just mean the meeting happened and was tidied up —
+      // marking a completed booking 'cancelled' would misrepresent it.
+      if (endCol !== -1) {
+        var endMs = new Date(rowVals[endCol]).getTime();
+        if (!isNaN(endMs) && endMs < now) continue;
+      }
+
       // Existence check over the booking's window (active events only). Fails
       // closed on any transient/uncertain error, so we only ever cancel a row
       // whose event is definitively gone.

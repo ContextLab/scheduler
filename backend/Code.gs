@@ -18,10 +18,19 @@ function doGet(e) {
 
   // Throttle the key-gated admin actions so the CLEANUP_KEY can't be brute-forced
   // through the unauthenticated web app.
-  if (action === 'cleanup' || action === 'debug') {
+  if (action === 'cleanup' || action === 'debug' || action === 'reconcile') {
     if (!rateBump(CacheService.getScriptCache(), 'rlg_' + action, 10, 60)) {
       return jsonResponse({ success: false, error: 'RATE_LIMITED', message: 'Too many requests.' });
     }
+  }
+
+  if (action === 'reconcile') {
+    var reconcileKey = (e && e.parameter && e.parameter.key) || '';
+    var ckey = Config.get('CLEANUP_KEY');
+    if (!ckey || reconcileKey !== ckey) {
+      return jsonResponse({ success: false, error: 'UNAUTHORIZED', message: 'Invalid key' });
+    }
+    return jsonResponse(reconcileBookings());
   }
 
   if (action === 'cleanup') {

@@ -88,6 +88,19 @@ r.test('is a no-op when every confirmed booking still has its event', function (
   assert.strictEqual(ctx.BookingStore.getByToken('t2').status, 'confirmed');
 });
 
+r.test('never cancels a PAST booking, even if its event is gone (history is left alone)', function () {
+  const pastStart = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const pastEnd = new Date(Date.now() - 47 * 60 * 60 * 1000).toISOString();
+  const ctx = makeCtx([
+    { token: 't-past', eventId: 'evt-past', status: 'confirmed', createdAt: '2026-01-01T00:00:00.000Z', startTime: pastStart, endTime: pastEnd },
+  ]);
+  // 'evt-past' is not seeded -> gone, but the meeting already ended.
+  const res = ctx.reconcileBookings();
+  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.reconciled, 0, 'a completed meeting must not be marked cancelled');
+  assert.strictEqual(ctx.BookingStore.getByToken('t-past').status, 'confirmed');
+});
+
 r.test('never cancels a confirmed row with a blank eventId (unverifiable => keep)', function () {
   const ctx = makeCtx([
     { token: 't-blank', eventId: '', status: 'confirmed', startTime: '2026-09-03T14:00:00.000Z', endTime: '2026-09-03T14:15:00.000Z' },
@@ -109,6 +122,40 @@ r.test('never cancels a freshly-created row even if its event is not yet visible
   assert.strictEqual(res.success, true);
   assert.strictEqual(res.reconciled, 0, 'a fresh row within the grace window must be left alone');
   assert.strictEqual(ctx.BookingStore.getByToken('t-fresh').status, 'confirmed');
+});
+
+// --- doGet 'reconcile' action (key-gated, for the scheduled maintenance job) ---
+const FULL_FILES = ['Booking.gs', 'Calendar.gs', 'Token.gs', 'Reconcile.gs', 'Code.gs'];
+
+function makeFullCtx(specs, cleanupKey) {
+  const ctx = loadBackend({
+    config: { CALENDAR_ID: CAL, SPREADSHEET_ID: 'sheet-1', CLEANUP_KEY: cleanupKey },
+    bookingRows: [],
+    calendarEvents: { [CAL]: [] },
+  }, FULL_FILES);
+  const H = ctx.BookingStore.HEADERS;
+  ctx._sheet._rows = [H.slice()].concat(specs.map(function (s) { return row(H, s); }));
+  return ctx;
+}
+
+function doGetJson(ctx, params) {
+  return JSON.parse(ctx.doGet({ parameter: params }).getContent());
+}
+
+r.test('doGet reconcile rejects a missing or wrong key', function () {
+  const ctx = makeFullCtx([], 'secret-key');
+  assert.strictEqual(doGetJson(ctx, { action: 'reconcile' }).error, 'UNAUTHORIZED');
+  assert.strictEqual(doGetJson(ctx, { action: 'reconcile', key: 'nope' }).error, 'UNAUTHORIZED');
+});
+
+r.test('doGet reconcile with the right key runs the sweep', function () {
+  const ctx = makeFullCtx([
+    { token: 't-gone', eventId: 'evt-gone', status: 'confirmed', startTime: '2026-09-10T14:00:00.000Z', endTime: '2026-09-10T14:15:00.000Z' },
+  ], 'secret-key');
+  const res = doGetJson(ctx, { action: 'reconcile', key: 'secret-key' });
+  assert.strictEqual(res.success, true, JSON.stringify(res));
+  assert.strictEqual(res.reconciled, 1);
+  assert.strictEqual(ctx.BookingStore.getByToken('t-gone').status, 'cancelled');
 });
 
 process.exit(r.done() === 0 ? 0 : 1);

@@ -1,4 +1,4 @@
-name: Cleanup Old Bookings
+name: Booking Maintenance
 
 on:
   schedule:
@@ -6,9 +6,25 @@ on:
   workflow_dispatch: {}   # Allow manual trigger
 
 jobs:
-  cleanup:
+  maintenance:
     runs-on: ubuntu-latest
     steps:
+      - name: Reconcile sheet/calendar drift
+        env:
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+          CLEANUP_KEY: ${{ secrets.CLEANUP_KEY }}
+        run: |
+          # Cancel any confirmed booking whose calendar event was deleted/moved
+          # out-of-band, so ghost rows stop blocking future slots. Idempotent.
+          RESPONSE=$(curl -s -L "${APPS_SCRIPT_URL}?action=reconcile&key=${CLEANUP_KEY}")
+          echo "Response: $RESPONSE"
+          SUCCESS=$(echo "$RESPONSE" | jq -r '.success')
+          if [ "$SUCCESS" != "true" ]; then
+            echo "Reconcile failed"
+            exit 1
+          fi
+          echo "Reconciled $(echo "$RESPONSE" | jq -r '.reconciled') ghost booking(s)"
+
       - name: Delete bookings older than 30 days
         env:
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
