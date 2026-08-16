@@ -108,6 +108,8 @@ var BookingForm = (function () {
       format: (document.getElementById('format').value || '').trim(),
       purpose: (document.getElementById('purpose').value || '').trim(),
       notes: (document.getElementById('notes').value || '').trim(),
+      // Honeypot: real users never see this field, so a non-empty value flags a bot.
+      hp: (function () { var el = document.getElementById('hp'); return el ? el.value : ''; })(),
     };
   }
 

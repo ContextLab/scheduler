@@ -13,6 +13,27 @@ const ApiClient = (function () {
   }
 
   /**
+   * A stable per-browser id so the backend can rate-limit each visitor in their
+   * own bucket. Without it every request keyed on 'anonymous' and all visitors
+   * shared one small bucket — a class opening the link together could exhaust it
+   * and get their bookings rejected. Persisted in localStorage; regenerated if
+   * storage is unavailable (private mode) so a request is never blocked here.
+   */
+  function getClientId() {
+    try {
+      var key = 'scheduler_client_id';
+      var id = window.localStorage.getItem(key);
+      if (!id) {
+        id = 'c-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+        window.localStorage.setItem(key, id);
+      }
+      return id;
+    } catch (e) {
+      return 'c-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+    }
+  }
+
+  /**
    * Prefetch slots for the full booking window at 15-min granularity.
    * Called on page load so data is ready when user reaches Step 3.
    */
@@ -115,7 +136,7 @@ const ApiClient = (function () {
       throw new Error('Apps Script URL not configured. Update settings.yaml with your deployed web app URL.');
     }
 
-    const body = JSON.stringify(Object.assign({ action: action }, data || {}));
+    const body = JSON.stringify(Object.assign({ action: action, clientId: getClientId() }, data || {}));
 
     var response;
     try {

@@ -114,9 +114,17 @@ var BookingStore = (function () {
    * @param {string} endISO     requested end (ISO 8601)
    * @param {string} excludeToken  token to ignore (e.g. the booking being
    *                                rescheduled); pass null/'' to check all.
+   * @param {function(object):boolean=} isGhostFn  optional predicate, given the
+   *   overlapping confirmed booking row, that returns true when the row is a
+   *   stale "ghost" — its calendar event was deleted/moved out-of-band AND it is
+   *   old enough that this can't be calendar read-after-write lag. A ghost is not
+   *   a real conflict, so the freed slot becomes bookable again. The predicate
+   *   MUST fail closed (treat fresh rows and unverifiable rows as real conflicts)
+   *   so it can never open a double-booking. Omit it and every confirmed row is
+   *   trusted (legacy behaviour).
    * @return {object|null} the clashing booking, or null if the slot is free.
    */
-  function findOverlappingConfirmed(startISO, endISO, excludeToken) {
+  function findOverlappingConfirmed(startISO, endISO, excludeToken, isGhostFn) {
     var reqStart = new Date(startISO).getTime();
     var reqEnd = new Date(endISO).getTime();
     if (isNaN(reqStart) || isNaN(reqEnd)) return null;
@@ -134,7 +142,11 @@ var BookingStore = (function () {
       if (isNaN(bStart) || isNaN(bEnd)) continue;
 
       // Half-open overlap: touching intervals (a.end === b.start) do not clash.
-      if (reqStart < bEnd && bStart < reqEnd) return b;
+      if (reqStart < bEnd && bStart < reqEnd) {
+        // Skip only rows the predicate positively identifies as stale ghosts.
+        if (isGhostFn && isGhostFn(b)) continue;
+        return b;
+      }
     }
     return null;
   }

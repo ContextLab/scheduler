@@ -126,4 +126,17 @@ describeIfExists('BookingForm.extractFormData', () => {
     expect(data.purpose).toBe('Discuss project');
     expect(data.notes).toBe('See doc link');
   });
+
+  test('honeypot defaults to empty when the field is absent or blank', () => {
+    // No #hp element present -> hp must be '' (a real user never fills it).
+    expect(BookingForm.extractFormData().hp).toBe('');
+  });
+
+  test('extracts a filled honeypot value (so the backend can reject the bot)', () => {
+    const hp = document.createElement('input');
+    hp.id = 'hp';
+    hp.value = 'http://spam.example';
+    document.getElementById('booking-form').appendChild(hp);
+    expect(BookingForm.extractFormData().hp).toBe('http://spam.example');
+  });
 });

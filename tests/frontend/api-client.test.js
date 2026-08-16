@@ -49,6 +49,35 @@ describe('ApiClient prefetch cache', () => {
   });
 });
 
+describe('ApiClient per-client id', () => {
+  let ApiClient;
+  let lastBody;
+  beforeEach(() => {
+    jest.resetModules();
+    try { window.localStorage.clear(); } catch (e) { /* ignore */ }
+    ApiClient = require('../../js/api-client');
+    lastBody = null;
+    global.fetch = jest.fn(function (_url, opts) {
+      lastBody = JSON.parse(opts.body);
+      return Promise.resolve({ ok: true, status: 200, statusText: 'OK', json: () => Promise.resolve({ success: true, slots: [] }) });
+    });
+    ApiClient.init('https://example.test/exec');
+  });
+
+  test('every request carries a clientId so the backend can bucket per visitor', async () => {
+    await ApiClient.createBooking({ start: 'x', end: 'y' });
+    expect(lastBody.clientId).toBeTruthy();
+    expect(typeof lastBody.clientId).toBe('string');
+  });
+
+  test('the clientId is stable across requests from the same browser', async () => {
+    await ApiClient.createBooking({ start: 'x', end: 'y' });
+    const first = lastBody.clientId;
+    await ApiClient.cancelBooking('tok');
+    expect(lastBody.clientId).toBe(first);
+  });
+});
+
 describe('ApiClient client-side merge (larger durations)', () => {
   // 15-min slots with a gap at [45,60): 0,15,30 | (gap) | 60,75,90,105 minutes.
   const base = Math.floor((Date.now() + 24 * 3600 * 1000) / (15 * 60 * 1000)) * (15 * 60 * 1000);

@@ -57,6 +57,12 @@
       <div id="instruction-banner" class="instruction-banner"></div>
       <button class="btn btn-back" id="back-to-step-3" aria-label="Go back to time selection">&larr; Back</button>
       <form id="booking-form" novalidate>
+        <!-- Honeypot: hidden from real users; only bots fill it. Kept off-screen
+             rather than display:none so naive bots still see it. -->
+        <div class="hp-field" aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;">
+          <label for="hp">Website</label>
+          <input type="text" id="hp" name="website" tabindex="-1" autocomplete="off">
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label for="first-name">First Name <span class="required">*</span></label>
