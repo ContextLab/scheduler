@@ -16,34 +16,17 @@ function doGet(e) {
     });
   }
 
-  // Throttle the key-gated admin actions so the CLEANUP_KEY can't be brute-forced
-  // through the unauthenticated web app.
-  if (action === 'cleanup' || action === 'debug' || action === 'reconcile') {
-    if (!rateBump(CacheService.getScriptCache(), 'rlg_' + action, 10, 60)) {
-      return jsonResponse({ success: false, error: 'RATE_LIMITED', message: 'Too many requests.' });
-    }
-  }
-
-  if (action === 'reconcile') {
-    var reconcileKey = (e && e.parameter && e.parameter.key) || '';
-    var ckey = Config.get('CLEANUP_KEY');
-    if (!ckey || reconcileKey !== ckey) {
-      return jsonResponse({ success: false, error: 'UNAUTHORIZED', message: 'Invalid key' });
-    }
-    return jsonResponse(reconcileBookings());
-  }
-
-  if (action === 'cleanup') {
-    var key = (e && e.parameter && e.parameter.key) || '';
-    var cleanupKey = Config.get('CLEANUP_KEY');
-    if (!cleanupKey || key !== cleanupKey) {
-      return jsonResponse({ success: false, error: 'UNAUTHORIZED', message: 'Invalid cleanup key' });
-    }
-    var deleted = BookingStore.deleteOldBookings(30);
-    return jsonResponse({ success: true, deleted: deleted });
-  }
+  // Maintenance actions (reconcile/cleanup). NOTE: for the scheduled job these
+  // should be called via POST with the key in the BODY (see doPost) — a key in a
+  // GET query string is logged and forwarded on redirects. This GET path is kept
+  // for manual/ad-hoc use only.
+  var admin = handleAdminAction(action, (e && e.parameter && e.parameter.key) || '');
+  if (admin) return admin;
 
   if (action === 'debug') {
+    if (!rateBump(CacheService.getScriptCache(), 'rlg_debug', 10, 60)) {
+      return jsonResponse({ success: false, error: 'RATE_LIMITED', message: 'Too many requests.' });
+    }
     var debugKey = (e && e.parameter && e.parameter.key) || '';
     var cleanupKey = Config.get('CLEANUP_KEY');
     if (!cleanupKey || debugKey !== cleanupKey) {
@@ -78,6 +61,13 @@ function doPost(e) {
   }
 
   try {
+    // Key-gated maintenance actions (reconcile/cleanup) authenticate with the key
+    // in the BODY, so the secret never appears in a URL query string or gets
+    // forwarded to another host on a redirect. This is the path the scheduled
+    // maintenance workflow uses.
+    var admin = handleAdminAction(action, requestData.key || '');
+    if (admin) return admin;
+
     // Rate limiting via CacheService. Buckets are keyed PER CLIENT so a busy
     // period (e.g. a whole class opening the booking link at once) can't let one
     // visitor exhaust a shared bucket and lock everyone else out — the bug that
@@ -454,6 +444,29 @@ function handleRescheduleBooking(data) {
 }
 
 // --- Helper Functions ---
+
+/**
+ * Key-gated maintenance actions (reconcile, cleanup), shared by doGet and doPost.
+ * The key is compared against CLEANUP_KEY. Prefer calling these via POST with the
+ * key in the request body — a key in a URL query string is written to server logs
+ * and forwarded to other hosts on redirects. Throttled so the key can't be
+ * brute-forced through the public web app.
+ *
+ * @return a response, or null if `action` is not a maintenance action (so the
+ *   caller can keep routing).
+ */
+function handleAdminAction(action, key) {
+  if (action !== 'reconcile' && action !== 'cleanup') return null;
+  if (!rateBump(CacheService.getScriptCache(), 'rlg_' + action, 10, 60)) {
+    return jsonResponse({ success: false, error: 'RATE_LIMITED', message: 'Too many requests.' });
+  }
+  var cleanupKey = Config.get('CLEANUP_KEY');
+  if (!cleanupKey || key !== cleanupKey) {
+    return jsonResponse({ success: false, error: 'UNAUTHORIZED', message: 'Invalid key' });
+  }
+  if (action === 'reconcile') return jsonResponse(reconcileBookings());
+  return jsonResponse({ success: true, deleted: BookingStore.deleteOldBookings(30) });
+}
 
 /**
  * Increment a cache counter within a window; return false once it hits `limit`.

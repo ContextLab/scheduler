@@ -142,6 +142,10 @@ function doGetJson(ctx, params) {
   return JSON.parse(ctx.doGet({ parameter: params }).getContent());
 }
 
+function doPostJson(ctx, body) {
+  return JSON.parse(ctx.doPost({ parameter: {}, postData: { contents: JSON.stringify(body) } }).getContent());
+}
+
 r.test('doGet reconcile rejects a missing or wrong key', function () {
   const ctx = makeFullCtx([], 'secret-key');
   assert.strictEqual(doGetJson(ctx, { action: 'reconcile' }).error, 'UNAUTHORIZED');
@@ -156,6 +160,28 @@ r.test('doGet reconcile with the right key runs the sweep', function () {
   assert.strictEqual(res.success, true, JSON.stringify(res));
   assert.strictEqual(res.reconciled, 1);
   assert.strictEqual(ctx.BookingStore.getByToken('t-gone').status, 'cancelled');
+});
+
+r.test('doPost reconcile (key in body) is the secure scheduled-job path', function () {
+  const ctx = makeFullCtx([
+    { token: 't-gone', eventId: 'evt-gone', status: 'confirmed', startTime: '2026-09-11T14:00:00.000Z', endTime: '2026-09-11T14:15:00.000Z' },
+  ], 'secret-key');
+  // wrong/missing key rejected...
+  assert.strictEqual(doPostJson(ctx, { action: 'reconcile' }).error, 'UNAUTHORIZED');
+  assert.strictEqual(doPostJson(ctx, { action: 'reconcile', key: 'nope' }).error, 'UNAUTHORIZED');
+  // ...right key runs the sweep, without needing a clientId or tripping booking limits.
+  const res = doPostJson(ctx, { action: 'reconcile', key: 'secret-key' });
+  assert.strictEqual(res.success, true, JSON.stringify(res));
+  assert.strictEqual(res.reconciled, 1);
+  assert.strictEqual(ctx.BookingStore.getByToken('t-gone').status, 'cancelled');
+});
+
+r.test('doPost cleanup (key in body) authenticates and runs', function () {
+  const ctx = makeFullCtx([], 'secret-key');
+  assert.strictEqual(doPostJson(ctx, { action: 'cleanup', key: 'nope' }).error, 'UNAUTHORIZED');
+  const res = doPostJson(ctx, { action: 'cleanup', key: 'secret-key' });
+  assert.strictEqual(res.success, true, JSON.stringify(res));
+  assert.ok(typeof res.deleted === 'number');
 });
 
 process.exit(r.done() === 0 ? 0 : 1);

@@ -16,7 +16,12 @@ jobs:
         run: |
           # Cancel any confirmed booking whose calendar event was deleted/moved
           # out-of-band, so ghost rows stop blocking future slots. Idempotent.
-          RESPONSE=$(curl -s -L "${APPS_SCRIPT_URL}?action=reconcile&key=${CLEANUP_KEY}")
+          # The key goes in the POST body (never the URL), so it isn't logged or
+          # forwarded to another host on Apps Script's redirect.
+          RESPONSE=$(curl -sS -L -X POST \
+            -H 'Content-Type: text/plain;charset=utf-8' \
+            --data "$(jq -nc --arg k "$CLEANUP_KEY" '{action:"reconcile", key:$k}')" \
+            "$APPS_SCRIPT_URL")
           echo "Response: $RESPONSE"
           SUCCESS=$(echo "$RESPONSE" | jq -r '.success')
           if [ "$SUCCESS" != "true" ]; then
@@ -30,7 +35,10 @@ jobs:
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
           CLEANUP_KEY: ${{ secrets.CLEANUP_KEY }}
         run: |
-          RESPONSE=$(curl -s -L "${APPS_SCRIPT_URL}?action=cleanup&key=${CLEANUP_KEY}")
+          RESPONSE=$(curl -sS -L -X POST \
+            -H 'Content-Type: text/plain;charset=utf-8' \
+            --data "$(jq -nc --arg k "$CLEANUP_KEY" '{action:"cleanup", key:$k}')" \
+            "$APPS_SCRIPT_URL")
           echo "Response: $RESPONSE"
           SUCCESS=$(echo "$RESPONSE" | jq -r '.success')
           if [ "$SUCCESS" != "true" ]; then
