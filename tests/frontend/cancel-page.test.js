@@ -26,6 +26,7 @@ describe('CancelPage — no cancel on page load', () => {
   beforeEach(() => {
     jest.resetModules();
     setupDOM();
+    global.PageMessage = require('../../js/page-message');
     CancelPage = require('../../js/cancel');
 
     global.ConfigLoader = {

@@ -316,7 +316,7 @@ var App = (function () {
         // A booking changed availability; drop the stale page-load snapshot so
         // any later slot fetch reflects the new state.
         ApiClient.invalidatePrefetch();
-        showConfirmation(result.booking, bookingData);
+        showConfirmation(result.booking, bookingData, !!result.pending);
         goToStep(5);
       })
       .catch(function (err) {
@@ -336,7 +336,12 @@ var App = (function () {
       });
   }
 
-  function showConfirmation(booking, formData) {
+  /**
+   * Step 5. With email verification on (the default) the backend returns
+   * `pending: true` and the booking is only a request: the visitor must click the
+   * link emailed to them before anything is put on the calendar.
+   */
+  function showConfirmation(booking, formData, pending) {
     var container = document.getElementById('confirmation-content');
     container.textContent = '';
 
@@ -345,12 +350,22 @@ var App = (function () {
 
     var checkmark = document.createElement('div');
     checkmark.className = 'checkmark';
-    checkmark.textContent = '\u2713';
+    checkmark.textContent = pending ? '\u2709' : '\u2713';
     box.appendChild(checkmark);
 
     var h2 = document.createElement('h2');
-    h2.textContent = 'Booking Confirmed!';
+    h2.textContent = pending ? 'Check Your Email to Confirm' : 'Booking Confirmed!';
     box.appendChild(h2);
+
+    if (pending) {
+      var action = document.createElement('p');
+      action.className = 'verify-notice';
+      var minutes = booking.verifyWithinMinutes || 60;
+      action.textContent = 'We sent a confirmation link to ' + formData.email + '. Your meeting is not booked '
+        + 'until you open it and click "Confirm booking" (within ' + minutes + ' minutes). '
+        + 'The time is not held for you until then.';
+      box.appendChild(action);
+    }
 
     var details = document.createElement('dl');
     details.className = 'confirmation-details';
@@ -405,7 +420,9 @@ var App = (function () {
     note.style.marginTop = '16px';
     note.style.fontSize = '0.85rem';
     note.style.color = '#636E72';
-    note.textContent = 'A calendar invite and confirmation email have been sent to ' + formData.email + '.';
+    note.textContent = pending
+      ? 'Don\'t see it? Check your spam folder.'
+      : 'A calendar invite and confirmation email have been sent to ' + formData.email + '.';
     box.appendChild(note);
 
     container.appendChild(box);

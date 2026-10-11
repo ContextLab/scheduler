@@ -11,6 +11,7 @@ A self-hosted scheduling application inspired by YouCanBook.me and Calendly, run
 - **Meeting type selection** — configurable via YAML (office hours, check-ins, project meetings, custom durations)
 - **Calendar availability** — reads availability windows from Google Calendar, checks configured calendars for conflicts
 - **Booking form** — collects visitor details, supports in-person and virtual formats
+- **Email verification** — bookings are finalized only after the visitor clicks a link sent to their address, which filters out non-legitimate bookings
 - **Email notifications** — sends confirmation, cancellation, and reschedule emails with iCal attachments
 - **Cancel & reschedule** — secure token-based links in every confirmation email
 - **Zero cost** — GitHub Pages (free) + Google Apps Script (free) + Google Sheets (free)
@@ -39,6 +40,7 @@ See the [full setup guide](https://cdl-scheduler.readthedocs.io/en/latest/setup.
 
 ```
 index.html         Main booking flow (4-step wizard)
+confirm.html       Email-verification page
 cancel.html        Cancellation page
 reschedule.html    Reschedule page
 config/            YAML configuration files

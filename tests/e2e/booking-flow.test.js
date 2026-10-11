@@ -11,6 +11,10 @@
  *   APPS_SCRIPT_URL=https://script.google.com/macros/s/xxx/exec \
  *   TEST_EMAIL=test@example.com \
  *   node tests/e2e/booking-flow.test.js
+ *
+ * With email verification on (the default), createBooking returns a pending
+ * request and emails TEST_EMAIL a confirm link. Re-run with
+ * CONFIRM_TOKEN=<token from that link> to confirm it and run the remaining steps.
  */
 
 const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL;
@@ -87,10 +91,25 @@ async function runTests() {
         notes: 'Automated test — safe to delete',
       });
       console.assert(result.success === true, 'createBooking should succeed');
-      console.assert(result.booking.token, 'booking should have token');
-      bookingToken = result.booking.token;
-      console.log('PASS: Create booking — token:', bookingToken.substring(0, 8) + '...');
-      passed++;
+      if (result.pending) {
+        // Email verification is on: the token only travels in the email sent to
+        // TEST_EMAIL. Re-run with CONFIRM_TOKEN=<token from that link> to confirm
+        // it and exercise the get/cancel steps.
+        console.log('PASS: Create booking — pending verification; check ' + TEST_EMAIL);
+        passed++;
+        if (process.env.CONFIRM_TOKEN) {
+          const conf = await apiCall('confirmBooking', { token: process.env.CONFIRM_TOKEN });
+          console.assert(conf.success === true, 'confirmBooking should succeed');
+          bookingToken = conf.booking.token;
+          console.log('PASS: Confirm booking');
+          passed++;
+        }
+      } else {
+        console.assert(result.booking.token, 'booking should have token');
+        bookingToken = result.booking.token;
+        console.log('PASS: Create booking — token:', bookingToken.substring(0, 8) + '...');
+        passed++;
+      }
     } catch (e) {
       console.log('FAIL: Create booking —', e.message);
       failed++;

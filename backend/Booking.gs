@@ -103,6 +103,8 @@ var BookingStore = (function () {
 
   /**
    * Find a confirmed booking whose time range overlaps [startISO, endISO].
+   * Only 'confirmed' rows count: a 'pending' row (awaiting email verification)
+   * deliberately does not hold its slot, so unverified requests can't squat times.
    *
    * This is the authoritative, immediately-consistent double-booking guard:
    * unlike the calendar (read back through the eventually-consistent
