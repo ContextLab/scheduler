@@ -156,6 +156,11 @@ function loadBackend(opts, files) {
   sandbox._sentEmails = sentEmails;
   sandbox.EmailService = {
     sendBookingConfirmation: function (r) { sentEmails.push({ type: 'confirm', record: r }); },
+    sendVerificationEmail: function (r) {
+      if (opts.verifyEmailFails) return false;
+      sentEmails.push({ type: 'verify', record: r });
+      return true;
+    },
     sendCancellationEmail: function (r) { sentEmails.push({ type: 'cancel', record: r }); },
     sendRescheduleEmail: function (a, b) { sentEmails.push({ type: 'reschedule', from: a, to: b }); },
   };

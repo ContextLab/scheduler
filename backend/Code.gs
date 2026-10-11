@@ -83,6 +83,8 @@ function doPost(e) {
         return handleGetAvailableSlots(requestData);
       case 'createBooking':
         return handleCreateBooking(requestData);
+      case 'confirmBooking':
+        return handleConfirmBooking(requestData);
       case 'cancelBooking':
         return handleCancelBooking(requestData);
       case 'getBooking':
@@ -170,30 +172,11 @@ function handleCreateBooking(data) {
       return jsonResponse({ success: false, error: 'SLOT_TAKEN', message: 'This time slot is no longer available. Please select another time.' });
     }
 
-    // Generate token first so it's available for the event description
-    var token = TokenService.generateToken();
-    var pagesUrl = Config.get('GITHUB_PAGES_URL');
-    data.token = token;
-
-    // Create calendar event
-    var ownerName = Config.get('OWNER_NAME') || 'Jeremy';
-    var ownerFirst = ownerName.split(' ')[0];
-    var eventTitle = data.eventLabel
-      ? data.firstName + '/' + ownerFirst + ' ' + data.eventLabel
-      : data.firstName + '/' + ownerFirst + ': ' + data.meetingTypeName;
-    var description = buildEventDescription(data);
-    var calendar = CalendarApp.getCalendarById(Config.get('CALENDAR_ID'));
-    var event = calendar.createEvent(eventTitle, startDate, endDate, {
-      guests: data.email,
-      sendInvites: true,
-      location: data.location,
-      description: description,
-    });
     var bookingRecord = {
-      token: token,
+      token: TokenService.generateToken(),
       tokenExpiresAt: TokenService.getExpiryDate(),
-      eventId: event.getId(),
-      status: 'confirmed',
+      eventId: '',
+      status: 'pending',
       meetingTypeId: data.meetingTypeId,
       meetingTypeName: data.meetingTypeName,
       eventLabel: data.eventLabel || '',
@@ -211,27 +194,103 @@ function handleCreateBooking(data) {
       rescheduledTo: '',
     };
 
-    BookingStore.create(bookingRecord);
+    // Email verification: store a PENDING row and email the visitor a link to
+    // confirm. Nothing is put on the calendar, no invite goes out, and the owner
+    // isn't notified until the address is proven to belong to the booker — this
+    // is what stops throwaway/non-legitimate bookings (and stops the form being
+    // used to make the owner's account mail invites to arbitrary addresses).
+    // A pending row deliberately does NOT hold the slot (only 'confirmed' rows
+    // block in findOverlappingConfirmed), so unverified requests can't squat
+    // times; availability is re-checked when the link is confirmed.
+    if (verificationRequired()) {
+      // The visitor can only finish via this email, so never report "check your
+      // email" when it can't be (or wasn't) sent — e.g. the MailApp quota is spent.
+      if (MailApp.getRemainingDailyQuota() < 1) {
+        return jsonResponse({ success: false, error: 'EMAIL_UNAVAILABLE', message: 'Bookings are temporarily unavailable. Please try again tomorrow or contact us by email.' });
+      }
+      BookingStore.create(bookingRecord);
+      if (!EmailService.sendVerificationEmail(bookingRecord)) {
+        BookingStore.updateStatus(bookingRecord.token, 'cancelled', { cancelledAt: new Date().toISOString() });
+        return jsonResponse({ success: false, error: 'EMAIL_UNAVAILABLE', message: 'We could not send the confirmation email. Please check the address and try again.' });
+      }
+      return jsonResponse({
+        success: true,
+        pending: true,
+        booking: {
+          start: data.start,
+          end: data.end,
+          email: data.email,
+          verifyWithinMinutes: verifyLinkMinutes(),
+        },
+      });
+    }
 
-    // Send emails
-    EmailService.sendBookingConfirmation(bookingRecord);
-
-    return jsonResponse({
-      success: true,
-      booking: {
-        token: token,
-        eventId: event.getId(),
-        start: data.start,
-        end: data.end,
-        cancelUrl: pagesUrl + '/cancel.html?token=' + token,
-        rescheduleUrl: pagesUrl + '/reschedule.html?token=' + token,
-      },
-    });
+    finalizeBooking(bookingRecord, function () { BookingStore.create(bookingRecord); });
+    return jsonResponse({ success: true, booking: bookingResponse(bookingRecord) });
   } finally {
     // Persist pending sheet writes BEFORE releasing the lock, so the next request
     // to take the lock sees this booking's row. Without the flush the row might
     // not commit until this execution ends (after releaseLock), leaving a window
     // where a concurrent booking reads a stale sheet and double-books.
+    try { SpreadsheetApp.flush(); } catch (e) { /* nothing pending */ }
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Finalize a pending booking once the visitor clicks the link in their
+ * verification email (confirm.html POSTs this after an explicit button click, so
+ * email link-scanners can't confirm on the visitor's behalf).
+ *
+ * Idempotent: confirming an already-confirmed booking returns it again rather
+ * than creating a second event.
+ */
+function handleConfirmBooking(data) {
+  if (!data.token) {
+    return jsonResponse({ success: false, error: 'VALIDATION_ERROR', message: 'Token is required' });
+  }
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    return jsonResponse({ success: false, error: 'LOCK_TIMEOUT', message: 'Server is busy. Please try again in a moment.' });
+  }
+
+  try {
+    var booking = BookingStore.getByToken(data.token);
+    if (!booking) {
+      return jsonResponse({ success: false, error: 'NOT_FOUND', message: 'Booking not found' });
+    }
+    if (booking.status === 'confirmed') {
+      return jsonResponse({ success: true, alreadyConfirmed: true, booking: bookingResponse(booking) });
+    }
+    if (booking.status !== 'pending') {
+      return jsonResponse({ success: false, error: 'ALREADY_CANCELLED', message: 'This booking request is no longer active.' });
+    }
+    if (isVerificationExpired(booking)) {
+      BookingStore.updateStatus(data.token, 'expired');
+      return jsonResponse({ success: false, error: 'EXPIRED', message: 'This confirmation link has expired. Please book again.' });
+    }
+
+    // The slot was never held while pending, so re-run both availability checks
+    // exactly as createBooking does — someone else may have confirmed first.
+    if (BookingStore.findOverlappingConfirmed(booking.startTime, booking.endTime, null, isStaleGhost) ||
+        !CalendarService.isRangeAvailable(new Date(booking.startTime), new Date(booking.endTime), booking.createdAt)) {
+      BookingStore.updateStatus(data.token, 'expired');
+      return jsonResponse({ success: false, error: 'SLOT_TAKEN', message: 'Sorry, this time was booked by someone else before you confirmed. Please choose another time.' });
+    }
+
+    finalizeBooking(booking, function () {
+      // createdAt is reset to the moment the event is created: the ghost guard
+      // (isStaleGhost) and reconcileBookings trust a row only while createdAt is
+      // inside GHOST_GRACE_MINUTES, to cover calendar read-after-write lag. Left
+      // at the request time, a link confirmed >10 min later would produce a row
+      // whose brand-new (not yet visible) event reads as "deleted" — letting a
+      // second booking take the slot, or reconcile cancel a live booking.
+      booking.createdAt = new Date().toISOString();
+      BookingStore.updateStatus(data.token, 'confirmed', { eventId: booking.eventId, createdAt: booking.createdAt });
+    });
+    return jsonResponse({ success: true, booking: bookingResponse(booking) });
+  } finally {
     try { SpreadsheetApp.flush(); } catch (e) { /* nothing pending */ }
     lock.releaseLock();
   }
@@ -255,6 +314,12 @@ function handleCancelBooking(data) {
   }
   if (booking.status === 'rescheduled') {
     return jsonResponse({ success: false, error: 'ALREADY_CANCELLED', message: 'This booking has been rescheduled' });
+  }
+
+  if (booking.status === 'pending' || booking.status === 'expired') {
+    // Never finalized: no calendar event exists and nobody was notified.
+    BookingStore.updateStatus(data.token, 'cancelled', { cancelledAt: new Date().toISOString() });
+    return jsonResponse({ success: true, message: 'Booking request cancelled' });
   }
 
   // Delete calendar event
@@ -324,21 +389,6 @@ function handleRescheduleBooking(data) {
     return jsonResponse({ success: false, error: 'ALREADY_CANCELLED', message: 'This booking cannot be rescheduled' });
   }
 
-  // Create new booking with reschedule
-  var newBookingData = {
-    meetingTypeId: oldBooking.meetingTypeId,
-    meetingTypeName: oldBooking.meetingTypeName || oldBooking.meetingTypeId,
-    start: data.newStart,
-    end: data.newEnd,
-    firstName: oldBooking.firstName,
-    lastName: oldBooking.lastName,
-    email: oldBooking.email,
-    format: oldBooking.format,
-    location: oldBooking.location,
-    purpose: oldBooking.purpose,
-    notes: oldBooking.notes,
-  };
-
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) {
     return jsonResponse({ success: false, error: 'LOCK_TIMEOUT', message: 'Server is busy. Please try again in a moment.' });
@@ -367,37 +417,11 @@ function handleRescheduleBooking(data) {
       Logger.log('Error deleting old event during reschedule: ' + err.message);
     }
 
-    // Generate new token first so it's available for the event description
     var newToken = TokenService.generateToken();
-    var pagesUrl = Config.get('GITHUB_PAGES_URL');
-
-    // Create new calendar event with the new token in the description
-    var descData = {
-      token: newToken,
-      firstName: oldBooking.firstName,
-      lastName: oldBooking.lastName,
-      email: oldBooking.email,
-      purpose: oldBooking.purpose,
-      notes: oldBooking.notes,
-    };
-    var ownerName = Config.get('OWNER_NAME') || 'Jeremy';
-    var ownerFirst = ownerName.split(' ')[0];
-    var eventTitle = oldBooking.eventLabel
-      ? oldBooking.firstName + '/' + ownerFirst + ' ' + oldBooking.eventLabel
-      : oldBooking.firstName + '/' + ownerFirst + ': ' + (oldBooking.meetingTypeName || oldBooking.meetingTypeId);
-    var description = buildEventDescription(descData);
-    var calendar = CalendarApp.getCalendarById(Config.get('CALENDAR_ID'));
-    var newEvent = calendar.createEvent(eventTitle, newStart, newEnd, {
-      guests: oldBooking.email,
-      sendInvites: true,
-      location: oldBooking.location,
-      description: description,
-    });
-
     var newBookingRecord = {
       token: newToken,
       tokenExpiresAt: TokenService.getExpiryDate(),
-      eventId: newEvent.getId(),
+      eventId: '',
       status: 'confirmed',
       meetingTypeId: oldBooking.meetingTypeId,
       meetingTypeName: oldBooking.meetingTypeName || oldBooking.meetingTypeId,
@@ -415,6 +439,8 @@ function handleRescheduleBooking(data) {
       cancelledAt: '',
       rescheduledTo: '',
     };
+    // The address was already verified when the original booking was confirmed.
+    newBookingRecord.eventId = createBookingEvent(newBookingRecord);
 
     BookingStore.create(newBookingRecord);
     BookingStore.updateStatus(data.oldToken, 'rescheduled', { rescheduledTo: newToken });
@@ -422,17 +448,7 @@ function handleRescheduleBooking(data) {
     // Send reschedule emails
     EmailService.sendRescheduleEmail(oldBooking, newBookingRecord);
 
-    return jsonResponse({
-      success: true,
-      booking: {
-        token: newToken,
-        eventId: newEvent.getId(),
-        start: data.newStart,
-        end: data.newEnd,
-        cancelUrl: pagesUrl + '/cancel.html?token=' + newToken,
-        rescheduleUrl: pagesUrl + '/reschedule.html?token=' + newToken,
-      },
-    });
+    return jsonResponse({ success: true, booking: bookingResponse(newBookingRecord) });
   } finally {
     // Persist pending sheet writes BEFORE releasing the lock, so the next request
     // to take the lock sees this booking's row. Without the flush the row might
@@ -444,6 +460,70 @@ function handleRescheduleBooking(data) {
 }
 
 // --- Helper Functions ---
+
+/** Whether new bookings must be confirmed via an emailed link (default: yes). */
+function verificationRequired() {
+  return String(Config.get('REQUIRE_EMAIL_VERIFICATION') || 'true').toLowerCase() !== 'false';
+}
+
+function verifyLinkMinutes() {
+  return parseInt(Config.get('VERIFY_LINK_MINUTES'), 10) || 60;
+}
+
+/** A pending booking whose confirmation link is older than VERIFY_LINK_MINUTES. */
+function isVerificationExpired(booking) {
+  var createdAt = new Date(booking.createdAt).getTime();
+  if (isNaN(createdAt)) return true; // can't tell when it was requested -> don't honour it
+  return (Date.now() - createdAt) > verifyLinkMinutes() * 60 * 1000;
+}
+
+/**
+ * Create the Google Calendar event (and native invite to the visitor) for a
+ * booking record. Returns the new event id.
+ */
+function createBookingEvent(record) {
+  var ownerName = Config.get('OWNER_NAME') || 'Jeremy';
+  var ownerFirst = ownerName.split(' ')[0];
+  var eventTitle = record.eventLabel
+    ? record.firstName + '/' + ownerFirst + ' ' + record.eventLabel
+    : record.firstName + '/' + ownerFirst + ': ' + (record.meetingTypeName || record.meetingTypeId);
+  var calendar = CalendarApp.getCalendarById(Config.get('CALENDAR_ID'));
+  var event = calendar.createEvent(eventTitle, new Date(record.startTime), new Date(record.endTime), {
+    guests: record.email,
+    sendInvites: true,
+    location: record.location,
+    description: buildEventDescription(record),
+  });
+  return event.getId();
+}
+
+/**
+ * Turn a booking record into a real meeting: calendar event + invite, persist
+ * it via `persist()` (create for a new row, updateStatus for a verified pending
+ * row), and only then send the visitor confirmation and owner notification — so
+ * nobody is emailed cancel/reschedule links for a row that failed to save.
+ * Mutates `record` (eventId, status). Call inside the script lock after
+ * availability checks.
+ */
+function finalizeBooking(record, persist) {
+  record.eventId = createBookingEvent(record);
+  record.status = 'confirmed';
+  persist();
+  EmailService.sendBookingConfirmation(record);
+}
+
+/** Public shape of a confirmed booking returned to the frontend. */
+function bookingResponse(record) {
+  var pagesUrl = Config.get('GITHUB_PAGES_URL');
+  return {
+    token: record.token,
+    eventId: record.eventId,
+    start: record.startTime,
+    end: record.endTime,
+    cancelUrl: pagesUrl + '/cancel.html?token=' + record.token,
+    rescheduleUrl: pagesUrl + '/reschedule.html?token=' + record.token,
+  };
+}
 
 /**
  * Key-gated maintenance actions (reconcile, cleanup), shared by doGet and doPost.
@@ -499,7 +579,7 @@ function rateBump(cache, key, limit, windowSec) {
  * @return {boolean} true if the request is allowed, false if it should be throttled.
  */
 function rateLimitOk(action, requestData) {
-  var WRITE_ACTIONS = { createBooking: true, cancelBooking: true, rescheduleBooking: true };
+  var WRITE_ACTIONS = { createBooking: true, confirmBooking: true, cancelBooking: true, rescheduleBooking: true };
   var cache = CacheService.getScriptCache();
   var clientId = requestData && requestData.clientId;
   var cid = clientId ? String(clientId).slice(0, 64) : 'anon';

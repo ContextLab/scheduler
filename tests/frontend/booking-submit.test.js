@@ -139,6 +139,23 @@ describe('app.js submitBooking flow', () => {
     expect(document.getElementById('step-5').classList.contains('active')).toBe(true);
   });
 
+  test('a pending (email-verification) response shows "check your email", not a confirmation', async () => {
+    global.ApiClient.createBooking = jest.fn(() => Promise.resolve({
+      success: true,
+      pending: true,
+      booking: { start: '2030-07-21T14:30:00.000Z', end: '2030-07-21T15:00:00.000Z', email: FORM_DATA.email, verifyWithinMinutes: 60 },
+    }));
+    App.submitBooking(FORM_DATA);
+    await flush();
+    expect(document.getElementById('step-5').classList.contains('active')).toBe(true);
+    const box = document.getElementById('confirmation-content');
+    expect(box.querySelector('h2').textContent).toBe('Check Your Email to Confirm');
+    expect(box.querySelector('.verify-notice').textContent).toContain(FORM_DATA.email);
+    expect(box.querySelector('.verify-notice').textContent).toContain('60 minutes');
+    expect(box.textContent).not.toContain('Booking Confirmed');
+    expect(box.querySelector('.confirmation-links a')).toBeNull(); // no cancel/reschedule links yet
+  });
+
   test('on SLOT_TAKEN it invalidates the prefetch, refreshes, and re-enables the button', async () => {
     const err = new Error('taken');
     err.code = 'SLOT_TAKEN';

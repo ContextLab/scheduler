@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirm Booking</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="lib/js-yaml.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Confirm Booking</h1>
+    </header>
+
+    <section class="step-content active">
+      <div id="confirm-content" class="confirmation-box">
+        <p>Loading booking details…</p>
+      </div>
+    </section>
+
+    <div id="loading" class="loading-overlay" aria-hidden="true">
+      <div class="spinner"></div>
+      <p>Confirming...</p>
+    </div>
+
+    <div id="error-banner" class="error-banner" role="alert" aria-live="polite"></div>
+  </div>
+
+  <script src="js/config-loader.js"></script>
+  <script src="js/timezone.js"></script>
+  <script src="js/api-client.js"></script>
+  <script src="js/page-message.js"></script>
+  <script src="js/confirm.js"></script>
+  <script>
+    // Confirmation is gated behind an explicit click inside ConfirmPage — it must
+    // never run on page load, or email link-scanners would verify on the visitor's behalf.
+    ConfirmPage.init();
+  </script>
+</body>
+</html>

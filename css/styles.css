@@ -519,6 +519,17 @@ a:hover {
   margin-top: 8px;
 }
 
+/* Action buttons beside link-buttons (confirm/cancel pages): size to the label
+   and match the link-button metrics so the row lines up. */
+.confirmation-links .btn-primary {
+  width: auto;
+  margin-top: 0;
+  padding: 10px 24px;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  line-height: inherit; /* <button> doesn't inherit it by default */
+}
+
 .btn-primary:hover {
   background-color: transparent;
   color: var(--primary-green);
@@ -557,6 +568,18 @@ a:hover {
 .confirmation-box h2 {
   text-align: center;
   margin-bottom: 24px;
+}
+
+.confirmation-box .verify-notice {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 16px 20px;
+  border-left: 4px solid var(--primary-green);
+  background: var(--bg-green-light);
+  text-align: left;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--dark-text);
 }
 
 .confirmation-details {
@@ -720,7 +743,8 @@ a:hover {
     gap: 12px;
   }
 
-  .confirmation-links a {
+  .confirmation-links a,
+  .confirmation-links .btn-primary {
     display: block;
     text-align: center;
     width: 100%;

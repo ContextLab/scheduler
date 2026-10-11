@@ -19,12 +19,13 @@ The frontend is a static site served from GitHub Pages. It loads configuration f
 - **Meeting type selection** — reads `config/meeting-types.yaml` to display available meeting types with descriptions
 - **Calendar view** — uses [FullCalendar](https://fullcalendar.io/) to render available time slots fetched from the backend
 - **Booking form** — collects visitor name, email, meeting format (virtual/in-person), purpose, and notes
-- **Reschedule/cancel pages** — token-authenticated pages for managing existing bookings
+- **Confirm/reschedule/cancel pages** — token-authenticated pages for verifying and managing bookings
 
 Key files:
 - `index.html` — meeting type selection page
 - `book.html` — calendar view and booking form
 - `reschedule.html` — reschedule flow with calendar
+- `confirm.html` — email-verification step (finalizes a pending booking)
 - `cancel.html` — cancellation confirmation
 - `config/settings.yaml` — timezone, Apps Script URL, display settings
 - `config/meeting-types.yaml` — meeting type definitions
@@ -57,8 +58,11 @@ The backend runs as a Google Apps Script web app, deployed as an API executable.
 4. Apps Script checks configured conflict calendars for busy times
 5. Free windows are split into slots of the requested duration
 6. Visitor picks a slot and submits the booking form
-7. Apps Script creates a calendar event, stores the booking in Sheets, and sends confirmation emails
-8. Both parties receive email with booking details and manage links (reschedule/cancel)
+7. Apps Script re-checks availability, stores a **pending** booking in Sheets, and emails the visitor a confirmation link (`confirm.html?token=…`). There's no calendar event, invite, or owner email yet, and the pending row doesn't hold the slot.
+8. The visitor opens the link and clicks **Confirm booking** (a click is required, so email link-scanners can't confirm on their behalf). Apps Script (`action=confirmBooking`) re-checks availability under the lock, creates the calendar event and invite, marks the booking confirmed, and sends confirmation emails
+9. Both parties receive email with booking details and manage links (reschedule/cancel)
+
+Email verification stops bookings made with throwaway or someone else's address, and stops the form being used to send invites to arbitrary addresses. It can be disabled with the `REQUIRE_EMAIL_VERIFICATION` Script Property.
 
 ### reschedule flow
 

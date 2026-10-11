@@ -187,6 +187,10 @@ const ApiClient = (function () {
     return apiCall('createBooking', bookingData);
   }
 
+  async function confirmBooking(token) {
+    return apiCall('confirmBooking', { token: token });
+  }
+
   async function cancelBooking(token) {
     return apiCall('cancelBooking', { token: token });
   }
@@ -222,6 +226,7 @@ const ApiClient = (function () {
     prefetchSlots: prefetchSlots,
     invalidatePrefetch: invalidatePrefetch,
     createBooking: createBooking,
+    confirmBooking: confirmBooking,
     cancelBooking: cancelBooking,
     getBooking: getBooking,
     rescheduleBooking: rescheduleBooking,

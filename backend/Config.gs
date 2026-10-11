@@ -30,6 +30,12 @@ var Config = (function () {
     // just-created event may not yet be visible via getEventById, so a fresh row
     // must never be mistaken for a "ghost" (deleted-out-of-band) row.
     GHOST_GRACE_MINUTES: '10',
+    // Email verification: a new booking is only a pending request until the
+    // visitor clicks the link emailed to them. Until then there is no calendar
+    // event, no invite, no owner notification, and the slot is NOT held. Set to
+    // 'false' to finalize bookings immediately (the pre-verification behaviour).
+    REQUIRE_EMAIL_VERIFICATION: 'true',
+    VERIFY_LINK_MINUTES: '60',  // how long a confirmation link stays valid
   };
 
   function get(key) {

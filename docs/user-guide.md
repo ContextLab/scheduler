@@ -73,9 +73,15 @@ If you selected **Chat or check-in** or **Project meeting**, an instruction bann
 
 Click **Submit** to complete your booking.
 
-### step 5: confirmation
+### step 5: confirm your email
 
-After submitting, you will see a confirmation page with:
+After submitting, the page asks you to **check your email**. We send a confirmation link to the address you entered. Open it and click **Confirm booking** to finalize the meeting.
+
+```{important}
+Your meeting is **not booked** until you click the confirmation link, and the time isn't held for you in the meantime. If someone else confirms the same time first, you'll be asked to pick another. Links expire after 60 minutes. If the email doesn't arrive, check your spam folder.
+```
+
+Once you confirm, you will see a confirmation page with:
 
 - The meeting type and duration
 - The meeting date, time, and location (virtual link or physical address)
@@ -131,8 +137,12 @@ After cancelling:
 
 CDL Scheduler sends automatic email notifications at each stage:
 
+### verification email
+- Sent to the visitor only, right after they submit the booking form
+- Contains the link to confirm the booking; nothing is booked (and the owner isn't notified) until it's clicked
+
 ### confirmation email
-- Sent to both the visitor and the calendar owner
+- Sent to both the visitor and the calendar owner once the booking is confirmed
 - Contains the meeting type, duration, date, time, location, and purpose
 - Includes an **iCal attachment** (.ics file) that can be added to your calendar app
 - Contains links to reschedule or cancel the booking

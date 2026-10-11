@@ -30,6 +30,10 @@ const BASE_CONFIG = {
   TOKEN_EXPIRY_DAYS: '90',
   CONFLICT_CALENDAR_IDS: '',
   FREE_EVENT_PATTERNS: '',
+  // These tests pin the finalize path (event + sheet + email) and its double-
+  // booking guards, so bookings finalize immediately here. The email-verification
+  // gate in front of that path is covered by email-verification.test.js.
+  REQUIRE_EMAIL_VERIFICATION: 'false',
 };
 
 function ev(summary, startMs, endMs, extra) {

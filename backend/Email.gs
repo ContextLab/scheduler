@@ -80,6 +80,51 @@ var EmailService = (function () {
   }
 
   /**
+   * Send the visitor a link to confirm a pending booking request. This is the
+   * ONLY email a new request triggers: no invite, no owner notification, no
+   * cancel/reschedule links — those follow once the visitor proves they own the
+   * address by clicking through (see handleConfirmBooking).
+   *
+   * @return {boolean} whether the email was handed to MailApp successfully.
+   */
+  function sendVerificationEmail(booking) {
+    var ownerName = Config.get('OWNER_NAME');
+    var pagesUrl = Config.get('GITHUB_PAGES_URL');
+    var minutes = parseInt(Config.get('VERIFY_LINK_MINUTES'), 10) || 60;
+
+    var startDate = new Date(booking.startTime);
+    var endDate = new Date(booking.endTime);
+    var dateStr = formatDateForEmail(startDate);
+    var timeStr = formatTimeRange(startDate, endDate);
+
+    var subject = 'Action needed: confirm your ' + booking.meetingTypeId + ' booking on ' + dateStr;
+    var body = 'Hi ' + booking.firstName + ',\n\n'
+      + 'Please confirm your meeting request by opening this link and clicking "Confirm booking":\n\n'
+      + pagesUrl + '/confirm.html?token=' + booking.token + '\n\n'
+      + 'Requested meeting:\n'
+      + '  Type: ' + booking.meetingTypeId + '\n'
+      + '  Date: ' + dateStr + '\n'
+      + '  Time: ' + timeStr + '\n\n'
+      + 'Your booking is NOT final until you confirm, and the time is not held for you in the meantime. '
+      + 'This link expires in ' + minutes + ' minutes.\n\n'
+      + 'If you didn\'t request this meeting, ignore this email and nothing will be booked.'
+      + '\n\nBest,\n' + ownerName;
+
+    try {
+      MailApp.sendEmail({
+        to: booking.email,
+        subject: subject,
+        body: body,
+        name: ownerName,
+      });
+      return true;
+    } catch (e) {
+      Logger.log('Failed to send verification email: ' + e.message);
+      return false;
+    }
+  }
+
+  /**
    * Send cancellation emails to both visitor and owner.
    */
   function sendCancellationEmail(booking) {
@@ -288,6 +333,7 @@ var EmailService = (function () {
 
   return {
     sendBookingConfirmation: sendBookingConfirmation,
+    sendVerificationEmail: sendVerificationEmail,
     sendCancellationEmail: sendCancellationEmail,
     sendRescheduleEmail: sendRescheduleEmail,
     buildICalContent: buildICalContent,

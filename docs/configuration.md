@@ -18,6 +18,8 @@ Script Properties are set in the Google Apps Script editor under **Project Setti
 | `MIN_NOTICE_HOURS` | Minimum hours of advance notice required for bookings | `12` | `24` |
 | `MAX_ADVANCE_DAYS` | Maximum number of days in advance a slot can be booked | `90` | `60` |
 | `TOKEN_EXPIRY_DAYS` | Number of days before booking management tokens expire | `90` | `30` |
+| `REQUIRE_EMAIL_VERIFICATION` | When `true`, a new booking is only a pending request until the visitor clicks the confirmation link emailed to them. No calendar event, invite, or owner notification is created before then, and the slot isn't held. Set to `false` to finalize bookings immediately. | `true` | `false` |
+| `VERIFY_LINK_MINUTES` | How long a confirmation link stays valid | `60` | `120` |
 | `CLEANUP_KEY` | Secret key for authenticating cleanup API requests | *(none)* | `a1b2c3d4e5...` |
 
 ```{note}
