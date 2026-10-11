@@ -84,6 +84,8 @@ var EmailService = (function () {
    * ONLY email a new request triggers: no invite, no owner notification, no
    * cancel/reschedule links — those follow once the visitor proves they own the
    * address by clicking through (see handleConfirmBooking).
+   *
+   * @return {boolean} whether the email was handed to MailApp successfully.
    */
   function sendVerificationEmail(booking) {
     var ownerName = Config.get('OWNER_NAME');
@@ -115,8 +117,10 @@ var EmailService = (function () {
         body: body,
         name: ownerName,
       });
+      return true;
     } catch (e) {
       Logger.log('Failed to send verification email: ' + e.message);
+      return false;
     }
   }
 

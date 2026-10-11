@@ -203,8 +203,16 @@ function handleCreateBooking(data) {
     // block in findOverlappingConfirmed), so unverified requests can't squat
     // times; availability is re-checked when the link is confirmed.
     if (verificationRequired()) {
+      // The visitor can only finish via this email, so never report "check your
+      // email" when it can't be (or wasn't) sent — e.g. the MailApp quota is spent.
+      if (MailApp.getRemainingDailyQuota() < 1) {
+        return jsonResponse({ success: false, error: 'EMAIL_UNAVAILABLE', message: 'Bookings are temporarily unavailable. Please try again tomorrow or contact us by email.' });
+      }
       BookingStore.create(bookingRecord);
-      EmailService.sendVerificationEmail(bookingRecord);
+      if (!EmailService.sendVerificationEmail(bookingRecord)) {
+        BookingStore.updateStatus(bookingRecord.token, 'cancelled', { cancelledAt: new Date().toISOString() });
+        return jsonResponse({ success: false, error: 'EMAIL_UNAVAILABLE', message: 'We could not send the confirmation email. Please check the address and try again.' });
+      }
       return jsonResponse({
         success: true,
         pending: true,
@@ -217,8 +225,7 @@ function handleCreateBooking(data) {
       });
     }
 
-    finalizeBooking(bookingRecord);
-    BookingStore.create(bookingRecord);
+    finalizeBooking(bookingRecord, function () { BookingStore.create(bookingRecord); });
     return jsonResponse({ success: true, booking: bookingResponse(bookingRecord) });
   } finally {
     // Persist pending sheet writes BEFORE releasing the lock, so the next request
@@ -267,13 +274,21 @@ function handleConfirmBooking(data) {
     // The slot was never held while pending, so re-run both availability checks
     // exactly as createBooking does — someone else may have confirmed first.
     if (BookingStore.findOverlappingConfirmed(booking.startTime, booking.endTime, null, isStaleGhost) ||
-        !CalendarService.isRangeAvailable(new Date(booking.startTime), new Date(booking.endTime))) {
+        !CalendarService.isRangeAvailable(new Date(booking.startTime), new Date(booking.endTime), booking.createdAt)) {
       BookingStore.updateStatus(data.token, 'expired');
       return jsonResponse({ success: false, error: 'SLOT_TAKEN', message: 'Sorry, this time was booked by someone else before you confirmed. Please choose another time.' });
     }
 
-    finalizeBooking(booking);
-    BookingStore.updateStatus(data.token, 'confirmed', { eventId: booking.eventId });
+    finalizeBooking(booking, function () {
+      // createdAt is reset to the moment the event is created: the ghost guard
+      // (isStaleGhost) and reconcileBookings trust a row only while createdAt is
+      // inside GHOST_GRACE_MINUTES, to cover calendar read-after-write lag. Left
+      // at the request time, a link confirmed >10 min later would produce a row
+      // whose brand-new (not yet visible) event reads as "deleted" — letting a
+      // second booking take the slot, or reconcile cancel a live booking.
+      booking.createdAt = new Date().toISOString();
+      BookingStore.updateStatus(data.token, 'confirmed', { eventId: booking.eventId, createdAt: booking.createdAt });
+    });
     return jsonResponse({ success: true, booking: bookingResponse(booking) });
   } finally {
     try { SpreadsheetApp.flush(); } catch (e) { /* nothing pending */ }
@@ -483,14 +498,17 @@ function createBookingEvent(record) {
 }
 
 /**
- * Turn a booking record into a real meeting: calendar event + invite, then the
- * visitor confirmation and owner notification. Mutates `record` (eventId,
- * status) — the caller persists it (create for a new row, updateStatus for a
- * verified pending row). Call inside the script lock after availability checks.
+ * Turn a booking record into a real meeting: calendar event + invite, persist
+ * it via `persist()` (create for a new row, updateStatus for a verified pending
+ * row), and only then send the visitor confirmation and owner notification — so
+ * nobody is emailed cancel/reschedule links for a row that failed to save.
+ * Mutates `record` (eventId, status). Call inside the script lock after
+ * availability checks.
  */
-function finalizeBooking(record) {
+function finalizeBooking(record, persist) {
   record.eventId = createBookingEvent(record);
   record.status = 'confirmed';
+  persist();
   EmailService.sendBookingConfirmation(record);
 }
 

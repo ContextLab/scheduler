@@ -80,12 +80,18 @@ var CalendarService = (function () {
    * match, so any interval offset from that grid — e.g. a client-merged 45-min
    * slot at 10:30 — was wrongly rejected as SLOT_TAKEN.)
    */
-  function isRangeAvailable(startDate, endDate) {
+  function isRangeAvailable(startDate, endDate, requestedAt) {
     var minNoticeHours = parseInt(Config.get('MIN_NOTICE_HOURS'), 10) || 12;
     var maxAdvanceDays = parseInt(Config.get('MAX_ADVANCE_DAYS'), 10) || 90;
 
-    var earliest = new Date(Date.now() + minNoticeHours * 60 * 60 * 1000);
-    var maxDate = new Date(Date.now() + maxAdvanceDays * 24 * 60 * 60 * 1000);
+    // Notice and advance limits are measured from when the visitor REQUESTED the
+    // slot (defaults to now). Confirming an emailed verification link minutes
+    // later must not fail a slot that satisfied min-notice when it was chosen —
+    // though it must still be in the future.
+    var from = requestedAt ? new Date(requestedAt).getTime() : Date.now();
+    if (isNaN(from)) from = Date.now();
+    var earliest = new Date(Math.max(from + minNoticeHours * 60 * 60 * 1000, Date.now()));
+    var maxDate = new Date(from + maxAdvanceDays * 24 * 60 * 60 * 1000);
 
     if (startDate >= endDate) return false;
     if (startDate < earliest) return false;

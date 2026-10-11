@@ -31,11 +31,14 @@ const CONFIG = {
   // REQUIRE_EMAIL_VERIFICATION deliberately unset: verification must be ON by default.
 };
 
-const FILES = ['Booking.gs', 'Calendar.gs', 'Token.gs', 'Code.gs'];
+const FILES = ['Booking.gs', 'Calendar.gs', 'Token.gs', 'Code.gs', 'Reconcile.gs'];
 
-function makeCtx(config) {
-  const winStart = Date.now() + 48 * HOUR;
+function makeCtx(config, harnessOpts) {
+  harnessOpts = harnessOpts || {};
+  const winStart = harnessOpts.winStart || Date.now() + 48 * HOUR;
   const ctx = loadBackend({
+    mailQuota: harnessOpts.mailQuota,
+    verifyEmailFails: harnessOpts.verifyEmailFails,
     config: Object.assign({}, CONFIG, config || {}),
     calendarEvents: { [CAL]: [{
       summary: 'Jeremy office hours',
@@ -75,6 +78,18 @@ function pendingToken(ctx, email) {
   const rows = ctx.BookingStore.getAll().filter(function (b) { return b.status === 'pending' && (!email || b.email === email); });
   assert.ok(rows.length, 'expected a pending row');
   return rows[rows.length - 1].token;
+}
+
+function ageRow(ctx, token, minutes) {
+  const H = ctx.BookingStore.HEADERS;
+  const row = ctx._sheet._rows.find(function (rr) { return rr[H.indexOf('token')] === token; });
+  row[H.indexOf('createdAt')] = new Date(Date.now() - minutes * MIN).toISOString();
+}
+
+// Simulate calendar read-after-write lag: the event exists but isn't yet visible
+// to CalendarApp.getEvents (the harness skips events without a start).
+function hideEvent(ctx, eventId) {
+  ctx._createdEvents.forEach(function (e) { if (e.id === eventId) e.start = undefined; });
 }
 
 const r = createRunner('Email verification gate (createBooking -> confirmBooking)');
@@ -208,6 +223,77 @@ r.test('REQUIRE_EMAIL_VERIFICATION=false finalizes immediately (opt-out)', funct
   assert.strictEqual(ctx._createdEvents.length, 1);
   assert.strictEqual(ctx.BookingStore.getAll()[0].status, 'confirmed');
   assert.deepStrictEqual(ctx._sentEmails.map(function (e) { return e.type; }), ['confirm']);
+});
+
+r.test('a link confirmed >GHOST_GRACE after the request is not mistaken for a ghost (no double-booking)', function () {
+  const ctx = makeCtx({ GHOST_GRACE_MINUTES: '10' });
+  create(ctx, 0, 30, { email: 'a@example.edu' });
+  create(ctx, 0, 30, { email: 'b@example.edu' });
+  const ta = pendingToken(ctx, 'a@example.edu');
+  const tb = pendingToken(ctx, 'b@example.edu');
+  ageRow(ctx, ta, 20); // A verifies 20 minutes after requesting
+  assert.strictEqual(confirm(ctx, ta).success, true);
+  hideEvent(ctx, ctx.BookingStore.getByToken(ta).eventId); // A's new event still propagating
+  const res = confirm(ctx, tb);
+  assert.strictEqual(res.error, 'SLOT_TAKEN', 'the fresh confirmed row must be trusted: ' + JSON.stringify(res));
+  assert.strictEqual(ctx.BookingStore.getAll().filter(function (b) { return b.status === 'confirmed'; }).length, 1);
+});
+
+r.test('reconcile does not cancel a just-confirmed booking whose event is still propagating', function () {
+  const ctx = makeCtx({ GHOST_GRACE_MINUTES: '10' });
+  create(ctx, 0, 30);
+  const t = pendingToken(ctx);
+  ageRow(ctx, t, 30);
+  confirm(ctx, t);
+  hideEvent(ctx, ctx.BookingStore.getByToken(t).eventId);
+  assert.strictEqual(ctx.reconcileBookings().reconciled, 0);
+  assert.strictEqual(ctx.BookingStore.getByToken(t).status, 'confirmed');
+});
+
+r.test('min-notice is measured from the request, so confirming later does not fail a near-limit slot', function () {
+  const ctx = makeCtx({ MIN_NOTICE_HOURS: '12' }, { winStart: Date.now() + 11 * HOUR + 50 * MIN });
+  const res = create(ctx, 15, 30); // slot at now+12h05m: just past the notice limit
+  assert.strictEqual(res.success, true, JSON.stringify(res));
+  const t = pendingToken(ctx);
+  // Simulate the visitor clicking the link 10 minutes later: the request is 10
+  // minutes old and the slot is 10 minutes closer (now+11h55m, inside 12h notice).
+  ageRow(ctx, t, 10);
+  const H = ctx.BookingStore.HEADERS;
+  const row = ctx._sheet._rows[1];
+  ['startTime', 'endTime'].forEach(function (k) {
+    row[H.indexOf(k)] = new Date(new Date(row[H.indexOf(k)]).getTime() - 10 * MIN).toISOString();
+  });
+  const c = confirm(ctx, t);
+  assert.strictEqual(c.success, true, JSON.stringify(c));
+});
+
+r.test('a slot that is already in the past at confirm time is still rejected', function () {
+  // Requested 13h ago (so request-relative notice would allow a start 1h ago),
+  // inside an availability window that spans now; the start has since passed.
+  const ctx = makeCtx({ MIN_NOTICE_HOURS: '12', VERIFY_LINK_MINUTES: '100000' }, { winStart: Date.now() - HOUR });
+  const H = ctx.BookingStore.HEADERS;
+  const spec = { token: 'past-1', status: 'pending', email: 'p@example.edu', firstName: 'P', lastName: 'Q',
+    meetingTypeId: 'office-hours', startTime: new Date(Date.now() - 30 * MIN).toISOString(),
+    endTime: new Date(Date.now()).toISOString(), createdAt: new Date(Date.now() - 13 * HOUR).toISOString() };
+  ctx._sheet._rows.push(H.map(function (h) { return spec[h] || ''; }));
+  const res = confirm(ctx, 'past-1');
+  assert.strictEqual(res.success, false, JSON.stringify(res));
+  assert.strictEqual(ctx._createdEvents.length, 0);
+});
+
+r.test('if the verification email fails to send, the visitor is told (not "check your email")', function () {
+  const ctx = makeCtx({}, { verifyEmailFails: true });
+  const res = create(ctx, 0, 30);
+  assert.strictEqual(res.success, false);
+  assert.strictEqual(res.error, 'EMAIL_UNAVAILABLE');
+  assert.strictEqual(ctx.BookingStore.getAll()[0].status, 'cancelled');
+});
+
+r.test('with the MailApp quota exhausted, nothing is stored and the visitor is told', function () {
+  const ctx = makeCtx({}, { mailQuota: 0 });
+  const res = create(ctx, 0, 30);
+  assert.strictEqual(res.error, 'EMAIL_UNAVAILABLE');
+  assert.strictEqual(ctx.BookingStore.getAll().length, 0);
 });
 
 process.exit(r.done() ? 1 : 0);
